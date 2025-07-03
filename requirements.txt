@@ -1,0 +1,16 @@
+streamlit
+torch
+torch-geometric
+pandas
+numpy
+scikit-learn
+plotly
+networkx
+tqdm
+joblib
+matplotlib
+seaborn
+optuna
+imbalanced-learn
+requests
+torchvision
