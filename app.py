@@ -992,8 +992,18 @@ def perform_eda(df):
                 # Normalisasi data untuk perbandingan
                 normalized_df = df[selected_features].copy()
                 for feature in selected_features:
-                    normalized_df[feature] = (normalized_df[feature] - normalized_df[feature].min()) / \
-                                            (normalized_df[feature].max() - normalized_df[feature].min())
+                    # Pastikan kolom adalah numerik
+                    if pd.api.types.is_numeric_dtype(normalized_df[feature]):
+                        # Tangani kasus nilai min dan max sama
+                        min_val = normalized_df[feature].min()
+                        max_val = normalized_df[feature].max()
+                        if min_val == max_val:
+                            normalized_df[feature] = 0  # atau 1, tergantung kebutuhan
+                        else:
+                            normalized_df[feature] = (normalized_df[feature] - min_val) / (max_val - min_val)
+                    else:
+                        st.warning(f"Kolom {feature} bukan numerik dan akan dilewati")
+                        normalized_df[feature] = 0
                 
                 # Reshape data untuk visualisasi
                 melted_df = pd.melt(normalized_df, value_vars=selected_features, var_name='Feature', value_name='Normalized Value')
