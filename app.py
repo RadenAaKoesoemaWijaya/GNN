@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -2233,6 +2232,55 @@ def update_progress(epoch, total_epochs, train_loss, val_loss, train_acc, val_ac
     fig.update_layout(title='Training Progress', xaxis_title='Epoch', yaxis_title='Loss')
     
     plot_container.plotly_chart(fig)
+
+def predict_page():
+    st.title('Predict Network Intrusions')
+    
+    # File upload section
+    uploaded_file = st.file_uploader("Upload network traffic data (CSV)", type=['csv'])
+    
+    if uploaded_file is not None:
+        try:
+            # Load and preprocess the data
+            df = pd.read_csv(uploaded_file)
+            st.write("Data Preview:")
+            st.dataframe(df.head())
+            
+            # Check if model exists
+            if not os.path.exists('models/ids_model.pt'):
+                st.error("No trained model found. Please train a model first.")
+                return
+            
+            # Preprocess data
+            data, features = preprocess_data(df)
+            
+            # Load model
+            model = IDSGNNModel(input_dim=len(features))
+            model.load_state_dict(torch.load('models/ids_model.pt'))
+            model.eval()
+            
+            # Make predictions
+            if st.button("Detect Intrusions"):
+                with torch.no_grad():
+                    out = model(data.x, data.edge_index)
+                    pred = out.argmax(dim=1)
+                
+                # Show results
+                st.success("Analysis Complete!")
+                results_df = pd.DataFrame({
+                    'Sample': range(len(pred)),
+                    'Prediction': pred.numpy()
+                })
+                st.write("Prediction Results:")
+                st.dataframe(results_df)
+                
+                # Visualize results
+                fig = px.histogram(results_df, x='Prediction', title='Distribution of Predictions')
+                st.plotly_chart(fig)
+                
+        except Exception as e:
+            st.error(f"Error during prediction: {str(e)}")
+            st.write("Please ensure your data is in the correct format and try again.")
 
 # Main function to run the app
 def main():
