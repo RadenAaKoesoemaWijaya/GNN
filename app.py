@@ -1460,8 +1460,14 @@ def extract_features(df, features):
         st.subheader("Feature Selection")
             
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        if 'Label' in numeric_cols:
-                numeric_cols.remove('Label')
+        selected_features = [col for col in selected_features if col in numeric_cols]
+
+        if 'Label' in selected_features:
+            selected_features.remove('Label')
+
+        # Extract features and labels
+        X = df[selected_features].values
+        y = df['Label'].values
             
         if len(numeric_cols) > 0:
                 # Pilih metode seleksi fitur
