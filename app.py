@@ -520,8 +520,8 @@ def preprocess_data(df):
 def perform_eda(df):
     st.header("Exploratory Data Analysis")
     
-    # Convert DataFrame to strings for display
-    display_df = df.copy()
+    # Inisialisasi processed_df di awal
+    processed_df = df.copy()
 
     # Tab untuk berbagai jenis analisis
     eda_tab1, eda_tab2, eda_tab3, eda_tab4, eda_tab5 = st.tabs([
@@ -535,16 +535,16 @@ def perform_eda(df):
         # Informasi dasar dataset
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Number of Samples", df.shape[0])
-            st.metric("Number of Features", df.shape[1])
+            st.metric("Number of Samples", processed_df.shape[0])
+            st.metric("Number of Features", processed_df.shape[1])
         
         with col2:
-            if 'Label' in df.columns:
-                st.metric("Number of Classes", df['Label'].nunique())
+            if 'Label' in processed_df.columns:
+                st.metric("Number of Classes", processed_df['Label'].nunique())
                 st.write("Class Distribution:")
                 
                 # Visualisasi distribusi kelas
-                label_counts = df['Label'].astype(str).value_counts().reset_index()
+                label_counts = processed_df['Label'].astype(str).value_counts().reset_index()
                 label_counts.columns = ['Label', 'Count']
                 
                 fig = px.bar(
@@ -560,7 +560,7 @@ def perform_eda(df):
         st.subheader("Data Types")
         
         # Hitung jumlah kolom berdasarkan tipe data
-        dtype_counts = df.dtypes.astype(str).value_counts().reset_index()
+        dtype_counts = processed_df.dtypes.astype(str).value_counts().reset_index()
         dtype_counts.columns = ['Data Type', 'Count']
         
         fig = px.pie(
@@ -573,11 +573,11 @@ def perform_eda(df):
         
         # Tampilkan sampel data
         st.subheader("Data Sample")
-        st.dataframe(df.head(10))
+        st.dataframe(processed_df.head(10))
         
         # Tampilkan statistik deskriptif
         st.subheader("Descriptive Statistics")
-        st.dataframe(df.describe())
+        st.dataframe(processed_df.describe())
         
         
         # Check for duplicate rows
@@ -1339,7 +1339,8 @@ def extract_features(df, features):
                                 'Original Value': list(target_map.keys()),
                                 'Numeric Value': list(target_map.values())
                             })
-                            with st.expander("View category to numeric mapping"):
+                            show_mapping = st.checkbox("Show category to numeric mapping")
+                            if show_mapping:
                                 st.dataframe(mapping_df)
                         
                         # Prepare feature data - handle missing and infinite values
