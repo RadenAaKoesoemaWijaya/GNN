@@ -26,7 +26,7 @@ from scipy.stats import pearsonr
 # Add this code near the top of your app.py file, after the imports and before any other Streamlit code
 
 # Set page configuration
-st.set_page_config(page_title='Network IDS with GNN', layout='wide')
+st.set_page_config(page_title='Anomaly Detection Webapp', layout='wide')
 
 # Custom CSS styling
 st.markdown("""
@@ -198,11 +198,11 @@ def make_json_serializable(obj):
 
 # Fungsi untuk menampilkan halaman utama
 def show_home_page():
-    st.title('Network Intrusion Detection System')
+    st.title('Anomaly Detection Webapp')
     st.markdown("""
-    ## Welcome to the Network Intrusion Detection System
+    ## Welcome to the Anomaly Detection Webapp
     
-    This application uses Graph Neural Networks to detect network intrusions based on network traffic data.
+    This application helps you detect anomalies in your data using advanced machine learning techniques, including Graph Neural Networks (GNN).
     
     ### What would you like to do?
     """)
@@ -244,32 +244,30 @@ def show_home_page():
     ---
     ### About this Application
     
-    This Network Intrusion Detection System (NIDS) uses Graph Neural Networks (GNN) to analyze network traffic 
-    and identify potential intrusions or attacks. The system can:
+    This Anomaly Detection Webapp enables you to analyze tabular data, perform exploratory data analysis, and detect anomalies using machine learning models.
     
-    - Process network traffic data in CSV format
+    - Upload your dataset (CSV format)
     - Perform comprehensive exploratory data analysis
-    - Extract relevant features for intrusion detection
-    - Train GNN models to detect various types of network attacks
-    - Visualize network traffic and detection results
+    - Extract relevant features for anomaly detection
+    - Train or use pre-trained models to detect anomalies
+    - Visualize results and download detected anomalies
     
-    ### Supported Attack Types
+    ### Supported Use Cases
     
-    The system can detect various types of network attacks, including:
-    - DDoS/DoS attacks
-    - Port scanning
-    - Brute force attacks
-    - Web attacks (SQL injection, XSS)
-    - Botnet activities
+    The system can be used for:
+    - Fraud detection
+    - Sensor fault detection
+    - Unusual pattern discovery
     - And more...
     
     ### How It Works
     
-    1. **Data Processing**: Network traffic data is preprocessed to extract relevant features
-    2. **Graph Construction**: Network connections are represented as a graph
-    3. **GNN Model**: Graph Neural Networks analyze the patterns in the graph
-    4. **Detection**: Anomalous patterns are identified as potential attacks
+    1. **Data Processing**: Your data is preprocessed and features are extracted
+    2. **Graph Construction**: Data is represented as a graph for GNN analysis
+    3. **Modeling**: Machine learning models analyze the data for anomalies
+    4. **Detection**: Anomalous patterns are identified and visualized
     
+    For detailed instructions, see the help section or the documentation.
     """)
 
 # Define preprocessing function
