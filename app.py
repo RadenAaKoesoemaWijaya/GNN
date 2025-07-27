@@ -8,7 +8,7 @@ from torch_geometric.data import Data
 import plotly.express as px
 import plotly.graph_objects as go
 import networkx as nx
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 import joblib
 import os
@@ -22,11 +22,6 @@ import re
 from sklearn.manifold import TSNE
 from sklearn.cluster import KMeans
 from scipy.stats import pearsonr
-from imblearn.over_sampling import SMOTE
-from imblearn.under_sampling import RandomUnderSampler
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, Dense
-from tensorflow.keras import regularizers
 
 # Add this code near the top of your app.py file, after the imports and before any other Streamlit code
 
@@ -200,26 +195,6 @@ def make_json_serializable(obj):
             return None
         else:
             return obj
-
-# Autoencoder for string to float conversion
-def autoencoder_string_to_float(df):
-    df = df.copy()
-    label_encoders = {}
-    for col in df.columns:
-        if df[col].dtype == 'object':
-            le = LabelEncoder()
-            df[col] = le.fit_transform(df[col].astype(str))
-            label_encoders[col] = le
-    # Simple autoencoder
-    input_dim = df.shape[1]
-    input_layer = Input(shape=(input_dim,))
-    encoded = Dense(input_dim//2, activation='relu', activity_regularizer=regularizers.l1(1e-5))(input_layer)
-    decoded = Dense(input_dim, activation='linear')(encoded)
-    autoencoder = Model(inputs=input_layer, outputs=decoded)
-    autoencoder.compile(optimizer='adam', loss='mse')
-    autoencoder.fit(df.values, df.values, epochs=10, batch_size=32, verbose=0)
-    encoded_features = autoencoder.predict(df.values)
-    return pd.DataFrame(encoded_features, columns=[f'ae_{i}' for i in range(encoded_features.shape[1])])
 
 # Fungsi untuk menampilkan halaman utama
 def show_home_page():
@@ -578,23 +553,7 @@ def perform_eda(df):
                     color='Count'
                 )
                 st.plotly_chart(fig, use_container_width=True)
-
-                # --- Imbalanced data handling ---
-                st.markdown("#### Handle Imbalanced Dataset")
-                imbalance_option = st.selectbox("Choose balancing method", ["None", "SMOTE", "Random Under Sampling"])
-                if imbalance_option == "SMOTE":
-                    smote = SMOTE()
-                    X_res, y_res = smote.fit_resample(processed_df.drop('Label', axis=1), processed_df['Label'])
-                    processed_df = pd.DataFrame(X_res, columns=processed_df.drop('Label', axis=1).columns)
-                    processed_df['Label'] = y_res
-                    st.success("SMOTE applied. Dataset balanced.")
-                elif imbalance_option == "Random Under Sampling":
-                    rus = RandomUnderSampler()
-                    X_res, y_res = rus.fit_resample(processed_df.drop('Label', axis=1), processed_df['Label'])
-                    processed_df = pd.DataFrame(X_res, columns=processed_df.drop('Label', axis=1).columns)
-                    processed_df['Label'] = y_res
-                    st.success("Random under sampling applied. Dataset balanced.")
-
+        
         # Tampilkan informasi tentang tipe data
         st.subheader("Data Types")
         
