@@ -8,7 +8,7 @@ from torch_geometric.data import Data
 import plotly.express as px
 import plotly.graph_objects as go
 import networkx as nx
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, RobustScaler
 from tqdm import tqdm
 import joblib
 import os
@@ -22,6 +22,13 @@ import re
 from sklearn.manifold import TSNE
 from sklearn.cluster import KMeans
 from scipy.stats import pearsonr
+from sklearn.ensemble import IsolationForest
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.svm import OneClassSVM
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score, precision_recall_curve, auc, precision_score, recall_score, f1_score, confusion_matrix
+import warnings
+warnings.filterwarnings('ignore')
 
 # Add this code near the top of your app.py file, after the imports and before any other Streamlit code
 
@@ -271,6 +278,32 @@ def show_home_page():
     """)
 
 # Define preprocessing function
+def preprocess_for_anomaly_detection(df):
+    """Preprocess data specifically for anomaly detection"""
+    df = df.copy()
+    
+    # Handle missing values with robust methods
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    # Use median for robust imputation
+    for col in numeric_cols:
+        df[col].fillna(df[col].median(), inplace=True)
+    
+    # Remove outliers using IQR method
+    for col in numeric_cols:
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df[col] = df[col].clip(lower_bound, upper_bound)
+    
+    # Robust scaling using StandardScaler
+    scaler = StandardScaler()
+    df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
+    
+    return df, scaler
+
 def preprocess_data(df):
     """Preprocess data for GNN model"""
     # Existing preprocessing code remains unchanged
@@ -1263,6 +1296,85 @@ def perform_eda(df):
             else:
                 st.warning("Not enough numeric features for dimensionality reduction. Need at least 3 numeric columns.")
 
+# Anomaly detection evaluation
+def evaluate_anomaly_detection(y_true, y_pred, scores):
+    """Evaluate anomaly detection performance"""
+    
+    # If no ground truth, use unsupervised metrics
+    if y_true is None or len(np.unique(y_true)) == 1:
+        return {
+            'total_anomalies': np.sum(y_pred),
+            'anomaly_rate': np.mean(y_pred),
+            'score_distribution': {
+                'min': np.min(scores),
+                'max': np.max(scores),
+                'mean': np.mean(scores),
+                'std': np.std(scores)
+            }
+        }
+    
+    # Supervised evaluation
+    return {
+        'precision': precision_score(y_true, y_pred),
+        'recall': recall_score(y_true, y_pred),
+        'f1_score': f1_score(y_true, y_pred),
+        'roc_auc': roc_auc_score(y_true, scores),
+        'confusion_matrix': confusion_matrix(y_true, y_pred)
+    }
+
+# Anomaly detection pipeline
+def run_anomaly_detection_pipeline(data, method='isolation_forest', contamination=0.1):
+    """Run complete anomaly detection pipeline"""
+    
+    # Method selection
+    if method == 'isolation_forest':
+        model = IsolationForest(contamination=contamination, random_state=42)
+    elif method == 'lof':
+        model = LocalOutlierFactor(n_neighbors=20, contamination=contamination)
+    elif method == 'one_class_svm':
+        model = OneClassSVM(nu=contamination, kernel='rbf', gamma='scale')
+    
+    # Fit and predict
+    if method != 'lof':
+        model.fit(data)
+        anomaly_scores = model.decision_function(data)
+        predictions = model.predict(data)
+    else:
+        predictions = model.fit_predict(data)
+        anomaly_scores = model.negative_outlier_factor_
+    
+    # Convert to binary labels
+    anomaly_labels = np.where(predictions == -1, 1, 0)
+    
+    return {
+        'anomaly_labels': anomaly_labels,
+        'anomaly_scores': anomaly_scores,
+        'model': model
+    }
+
+# Enhanced visualization functions
+def visualize_anomalies(df, anomaly_labels, anomaly_scores):
+    """Create comprehensive anomaly visualizations"""
+    
+    # Scatter plot with anomalies highlighted
+    fig = px.scatter(df, x=df.columns[0], y=df.columns[1], 
+                     color=anomaly_labels.astype(str),
+                     title='Anomaly Detection Results',
+                     labels={'color': 'Anomaly'})
+    
+    # Anomaly score distribution
+    score_fig = px.histogram(anomaly_scores, nbins=50,
+                           title='Anomaly Score Distribution')
+    
+    # 3D visualization if enough features
+    if len(df.columns) >= 3:
+        fig_3d = px.scatter_3d(df, x=df.columns[0], y=df.columns[1], z=df.columns[2],
+                              color=anomaly_labels.astype(str),
+                              title='3D Anomaly Visualization')
+        return fig, score_fig, fig_3d
+    
+    return fig, score_fig
+
 # Fungsi untuk ekstraksi fitur
 def extract_features(df, features):
     st.subheader("Feature Extraction and Selection")
@@ -2026,6 +2138,134 @@ def extract_features(df, features):
     
     return df, features
 
+def train_anomaly_detection_model(df):
+    """Train anomaly detection model"""
+    st.subheader("Anomaly Detection Model Training")
+    
+    # Preprocess data
+    processed_df, scaler = preprocess_for_anomaly_detection(df)
+    
+    # Enhanced visualization after training
+    if st.checkbox("Show advanced visualizations"):
+        # Correlation heatmap
+        numeric_df = processed_df[numeric_cols]
+        correlation_matrix = numeric_df.corr()
+        
+        fig, ax = plt.subplots(figsize=(12, 10))
+        sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', center=0, ax=ax)
+        plt.title('Feature Correlation Heatmap')
+        st.pyplot(fig)
+    
+    # Feature importance visualization
+    if hasattr(results['model'], 'feature_importances_'):
+        importance_df = pd.DataFrame({
+            'Feature': numeric_cols,
+            'Importance': results['model'].feature_importances_
+        }).sort_values('Importance', ascending=False)
+        
+        fig = px.bar(importance_df.head(10), x='Feature', y='Importance',
+                    title='Top 10 Most Important Features')
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Select features for anomaly detection
+    numeric_cols = processed_df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    if len(numeric_cols) == 0:
+        st.error("No numeric features found for anomaly detection")
+        return None
+    
+    # Select anomaly detection method
+    method = st.selectbox(
+        "Select anomaly detection method",
+        options=["isolation_forest", "lof", "one_class_svm"]
+    )
+    
+    # Set contamination parameter
+    contamination = st.slider(
+        "Contamination rate (expected proportion of anomalies)",
+        min_value=0.01,
+        max_value=0.5,
+        value=0.1,
+        step=0.01
+    )
+    
+    # Train model
+    if st.button("Train Anomaly Detection Model"):
+        with st.spinner("Training anomaly detection model..."):
+            # Prepare data
+            X = processed_df[numeric_cols].values
+            
+            # Run anomaly detection
+            results = run_anomaly_detection_pipeline(X, method, contamination)
+            
+            # Display results
+            st.success("Anomaly detection model trained successfully!")
+            
+            # Show anomaly distribution
+            anomaly_count = np.sum(results['anomaly_labels'])
+            total_count = len(results['anomaly_labels'])
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total Samples", total_count)
+                st.metric("Anomalies Detected", anomaly_count)
+            with col2:
+                st.metric("Anomaly Rate", f"{anomaly_count/total_count:.2%}")
+                st.metric("Normal Samples", total_count - anomaly_count)
+            
+            # Visualize results
+            results_df = pd.DataFrame({
+                'anomaly_score': results['anomaly_scores'],
+                'is_anomaly': results['anomaly_labels']
+            })
+            
+            # Distribution of anomaly scores
+            fig = px.histogram(
+                results_df, 
+                x='anomaly_score',
+                color='is_anomaly',
+                title='Distribution of Anomaly Scores',
+                nbins=50
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Save model
+            model_data = {
+                'model': results['model'],
+                'scaler': scaler,
+                'features': numeric_cols,
+                'contamination': contamination,
+                'method': method
+            }
+            
+            model_path = os.path.join('d:\cybersecurity', 'anomaly_model.pkl')
+            joblib.dump(model_data, model_path)
+            st.success(f"Anomaly detection model saved to {model_path}")
+            
+            # Model persistence options
+            st.subheader("Model Management")
+
+            # Save model with metadata
+            model_path = os.path.join('models', f'anomaly_model_{method}_{pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")}.pkl')
+            saved_path = save_anomaly_model(
+                results['model'], scaler, numeric_cols, method, contamination, model_path
+            )
+            st.success(f"Model saved to: {saved_path}")
+
+            # List saved models
+            if st.checkbox("View saved models"):
+                models_dir = 'models'
+                if os.path.exists(models_dir):
+                    model_files = [f for f in os.listdir(models_dir) if f.endswith('.pkl')]
+                    if model_files:
+                        st.write("Available models:")
+                        for model_file in model_files:
+                            st.write(f"- {model_file}")
+                    else:
+                        st.info("No saved models found")
+            return results
+    return None
+
 def train_model_page():
     st.title('Train Network Intrusion Detection Model')
     
@@ -2078,8 +2318,15 @@ def train_model_page():
             validation_split = st.slider("Validation Split", 0.1, 0.3, 0.2, step=0.05)
             use_class_weights = st.checkbox("Use Class Weights for Imbalanced Data", value=True)
         
-        # Start training
-        if st.button("Train Model"):
+        # Anomaly detection option
+    use_anomaly_detection = st.checkbox("Use Anomaly Detection (Unsupervised)", value=False)
+    
+    if use_anomaly_detection:
+        train_anomaly_detection_model(df)
+        return
+    
+    # Start training
+    if st.button("Train Model"):
 
             st.info("Starting model training process...")
 
@@ -2248,6 +2495,73 @@ def update_progress(epoch, total_epochs, train_loss, val_loss, train_acc, val_ac
     
     plot_container.plotly_chart(fig)
 
+def predict_anomalies(df, model_data):
+    """Predict anomalies using trained model"""
+    st.subheader("Anomaly Detection Results")
+    
+    # Preprocess data
+    processed_df = df.copy()
+    scaler = model_data['scaler']
+    features = model_data['features']
+    method = model_data['method']
+    
+    # Ensure all required features are present
+    missing_features = [f for f in features if f not in processed_df.columns]
+    if missing_features:
+        st.error(f"Missing required features: {missing_features}")
+        return None
+    
+    # Scale features
+    X = processed_df[features].values
+    X_scaled = scaler.transform(X)
+    
+    # Run anomaly detection
+    results = run_anomaly_detection_pipeline(X_scaled, method, model_data['contamination'])
+    
+    # Add results to dataframe
+    processed_df['anomaly_score'] = results['anomaly_scores']
+    processed_df['is_anomaly'] = results['anomaly_labels']
+    
+    # Display results
+    st.success("Anomaly detection completed!")
+    
+    # Summary statistics
+    anomaly_count = np.sum(processed_df['is_anomaly'])
+    total_count = len(processed_df)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Total Samples", total_count)
+        st.metric("Anomalies Detected", anomaly_count)
+    with col2:
+        st.metric("Anomaly Rate", f"{anomaly_count/total_count:.2%}")
+    
+    # Visualize results
+    fig = px.histogram(
+        processed_df,
+        x='anomaly_score',
+        color='is_anomaly',
+        title='Distribution of Anomaly Scores',
+        nbins=50
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Show top anomalies
+    st.subheader("Top Anomalies")
+    top_anomalies = processed_df.nlargest(10, 'anomaly_score')[features + ['anomaly_score']]
+    st.dataframe(top_anomalies)
+    
+    # Download results
+    csv = processed_df.to_csv(index=False)
+    st.download_button(
+        label="Download Results (CSV)",
+        data=csv,
+        file_name="anomaly_detection_results.csv",
+        mime="text/csv"
+    )
+    
+    return processed_df
+
 def predict_page():
     st.title('Predict Network Intrusions')
     
@@ -2269,33 +2583,91 @@ def predict_page():
             # Preprocess data
             data, features = preprocess_data(df)
             
-            # Load model
-            model = IDSGNNModel(input_dim=len(features))
-            model.load_state_dict(torch.load('models/ids_model.pt'))
-            model.eval()
+            # Check if anomaly detection model exists
+            anomaly_model_path = os.path.join('d:\cybersecurity', 'anomaly_model.pkl')
             
-            # Make predictions
-            if st.button("Detect Intrusions"):
-                with torch.no_grad():
-                    out = model(data.x, data.edge_index)
-                    pred = out.argmax(dim=1)
+            if os.path.exists(anomaly_model_path):
+                model_data = joblib.load(anomaly_model_path)
                 
-                # Show results
-                st.success("Analysis Complete!")
-                results_df = pd.DataFrame({
-                    'Sample': range(len(pred)),
-                    'Prediction': pred.numpy()
-                })
-                st.write("Prediction Results:")
-                st.dataframe(results_df)
+                if st.button("Detect Anomalies"):
+                    results = predict_anomalies(df, model_data)
+                    
+                    if results is not None:
+                        # Additional visualization
+                        st.subheader("Feature Analysis for Anomalies")
+                        
+                        # Select features to visualize
+                        numeric_cols = results.select_dtypes(include=[np.number]).columns.tolist()
+                        if 'anomaly_score' in numeric_cols:
+                            numeric_cols.remove('anomaly_score')
+                        
+                        if len(numeric_cols) > 0:
+                            selected_feature = st.selectbox(
+                                "Select feature to visualize",
+                                options=numeric_cols
+                            )
+                            
+                            # Box plot showing feature distribution by anomaly status
+                            fig = px.box(
+                                results,
+                                x='is_anomaly',
+                                y=selected_feature,
+                                title=f'{selected_feature} Distribution by Anomaly Status'
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No anomaly detection model found. Please train a model first.")
                 
-                # Visualize results
-                fig = px.histogram(results_df, x='Prediction', title='Distribution of Predictions')
-                st.plotly_chart(fig)
+                # Fallback to original prediction method
+                if os.path.exists('models/ids_model.pt'):
+                    model = IDSGNNModel(input_dim=len(features))
+                    model.load_state_dict(torch.load('models/ids_model.pt'))
+                    model.eval()
+                    
+                    if st.button("Detect Intrusions"):
+                        with torch.no_grad():
+                            out = model(data.x, data.edge_index)
+                            pred = out.argmax(dim=1)
+                        
+                        st.success("Analysis Complete!")
+                        results_df = pd.DataFrame({
+                            'Sample': range(len(pred)),
+                            'Prediction': pred.numpy()
+                        })
+                        st.write("Prediction Results:")
+                        st.dataframe(results_df)
+                        
+                        fig = px.histogram(results_df, x='Prediction', title='Distribution of Predictions')
+                        st.plotly_chart(fig)
                 
         except Exception as e:
             st.error(f"Error during prediction: {str(e)}")
             st.write("Please ensure your data is in the correct format and try again.")
+
+def save_anomaly_model(model, scaler, features, method, contamination, filepath):
+    """Save trained anomaly detection model"""
+    model_data = {
+        'model': model,
+        'scaler': scaler,
+        'features': features,
+        'method': method,
+        'contamination': contamination,
+        'timestamp': pd.Timestamp.now().isoformat()
+    }
+    
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    joblib.dump(model_data, filepath)
+    return filepath
+
+def load_anomaly_model(filepath):
+    """Load saved anomaly detection model"""
+    if os.path.exists(filepath):
+        model_data = joblib.load(filepath)
+        return model_data
+    else:
+        st.error(f"Model file not found: {filepath}")
+        return None
 
 # Main function to run the app
 def main():
