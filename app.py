@@ -33,7 +33,7 @@ warnings.filterwarnings('ignore')
 # Add this code near the top of your app.py file, after the imports and before any other Streamlit code
 
 # Set page configuration
-st.set_page_config(page_title='Anomaly Detection Webapp', layout='wide')
+st.set_page_config(page_title='MALDET', layout='wide')
 
 # Custom CSS styling
 st.markdown("""
@@ -205,7 +205,7 @@ def make_json_serializable(obj):
 
 # Fungsi untuk menampilkan halaman utama
 def show_home_page():
-    st.title('Anomaly Detection Webapp')
+    st.title('MALDET')
     st.markdown("""
     ## Welcome to the Anomaly Detection Webapp
     
@@ -1296,9 +1296,9 @@ def perform_eda(df):
             else:
                 st.warning("Not enough numeric features for dimensionality reduction. Need at least 3 numeric columns.")
 
-# Anomaly detection evaluation
+# Enhanced anomaly detection evaluation
 def evaluate_anomaly_detection(y_true, y_pred, scores):
-    """Evaluate anomaly detection performance"""
+    """Evaluate anomaly detection performance with comprehensive metrics"""
     
     # If no ground truth, use unsupervised metrics
     if y_true is None or len(np.unique(y_true)) == 1:
@@ -1310,16 +1310,42 @@ def evaluate_anomaly_detection(y_true, y_pred, scores):
                 'max': np.max(scores),
                 'mean': np.mean(scores),
                 'std': np.std(scores)
+            },
+            'anomaly_thresholds': {
+                'q1': np.percentile(scores, 25),
+                'q3': np.percentile(scores, 75),
+                'iqr': np.percentile(scores, 75) - np.percentile(scores, 25)
             }
         }
     
-    # Supervised evaluation
+    # Supervised evaluation with additional metrics
+    precision = precision_score(y_true, y_pred)
+    recall = recall_score(y_true, y_pred)
+    f1 = f1_score(y_true, y_pred)
+    
+    # ROC and PR curves
+    roc_auc = roc_auc_score(y_true, scores)
+    precision_curve, recall_curve, _ = precision_recall_curve(y_true, scores)
+    pr_auc = auc(recall_curve, precision_curve)
+    
+    # Confusion matrix analysis
+    cm = confusion_matrix(y_true, y_pred)
+    tn, fp, fn, tp = cm.ravel()
+    
     return {
-        'precision': precision_score(y_true, y_pred),
-        'recall': recall_score(y_true, y_pred),
-        'f1_score': f1_score(y_true, y_pred),
-        'roc_auc': roc_auc_score(y_true, scores),
-        'confusion_matrix': confusion_matrix(y_true, y_pred)
+        'precision': precision,
+        'recall': recall,
+        'f1_score': f1,
+        'roc_auc': roc_auc,
+        'pr_auc': pr_auc,
+        'confusion_matrix': cm,
+        'true_negatives': tn,
+        'false_positives': fp,
+        'false_negatives': fn,
+        'true_positives': tp,
+        'specificity': tn / (tn + fp) if (tn + fp) > 0 else 0,
+        'false_positive_rate': fp / (fp + tn) if (fp + tn) > 0 else 0,
+        'false_negative_rate': fn / (fn + tp) if (fn + tp) > 0 else 0
     }
 
 # Anomaly detection pipeline
@@ -1353,27 +1379,101 @@ def run_anomaly_detection_pipeline(data, method='isolation_forest', contaminatio
     }
 
 # Enhanced visualization functions
-def visualize_anomalies(df, anomaly_labels, anomaly_scores):
+def visualize_anomalies(df, anomaly_labels, anomaly_scores, method='isolation_forest'):
     """Create comprehensive anomaly visualizations"""
     
-    # Scatter plot with anomalies highlighted
-    fig = px.scatter(df, x=df.columns[0], y=df.columns[1], 
-                     color=anomaly_labels.astype(str),
-                     title='Anomaly Detection Results',
-                     labels={'color': 'Anomaly'})
+    # Create subplots for comprehensive visualization
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=('2D Feature Space', 'Anomaly Score Distribution', 
+                      'Feature Importance', 'Anomaly Heatmap'),
+        specs=[[{"type": "scatter"}, {"type": "histogram"}],
+               [{"type": "bar"}, {"type": "heatmap"}]]
+    )
+    
+    # 2D scatter plot
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    if len(numeric_cols) >= 2:
+        fig.add_trace(
+            go.Scatter(
+                x=df[numeric_cols[0]],
+                y=df[numeric_cols[1]],
+                mode='markers',
+                marker=dict(
+                    color=anomaly_labels,
+                    colorscale=['blue', 'red'],
+                    showscale=True,
+                    colorbar=dict(title="Anomaly")
+                ),
+                name="Data Points"
+            ),
+            row=1, col=1
+        )
     
     # Anomaly score distribution
-    score_fig = px.histogram(anomaly_scores, nbins=50,
-                           title='Anomaly Score Distribution')
+    fig.add_trace(
+        go.Histogram(
+            x=anomaly_scores,
+            nbinsx=50,
+            name="Anomaly Scores",
+            marker_color='lightblue'
+        ),
+        row=1, col=2
+    )
+    
+    # Feature importance (if model supports it)
+    if hasattr(model, 'feature_importances_'):
+        importance_df = pd.DataFrame({
+            'feature': numeric_cols,
+            'importance': model.feature_importances_
+        }).sort_values('importance', ascending=False).head(10)
+        
+        fig.add_trace(
+            go.Bar(
+                x=importance_df['importance'],
+                y=importance_df['feature'],
+                orientation='h',
+                marker_color='green'
+            ),
+            row=2, col=1
+        )
+    
+    # Anomaly heatmap for first few features
+    if len(numeric_cols) >= 4:
+        heatmap_data = df[numeric_cols[:4]].copy()
+        heatmap_data['anomaly'] = anomaly_labels
+        
+        corr_matrix = heatmap_data.corr()
+        fig.add_trace(
+            go.Heatmap(
+                z=corr_matrix.values,
+                x=corr_matrix.columns,
+                y=corr_matrix.columns,
+                colorscale='RdBu'
+            ),
+            row=2, col=2
+        )
+    
+    fig.update_layout(
+        height=800,
+        title_text=f"Anomaly Detection Visualization - {method.title()}",
+        showlegend=False
+    )
     
     # 3D visualization if enough features
-    if len(df.columns) >= 3:
-        fig_3d = px.scatter_3d(df, x=df.columns[0], y=df.columns[1], z=df.columns[2],
-                              color=anomaly_labels.astype(str),
-                              title='3D Anomaly Visualization')
-        return fig, score_fig, fig_3d
+    if len(numeric_cols) >= 3:
+        fig_3d = px.scatter_3d(
+            df, 
+            x=numeric_cols[0], 
+            y=numeric_cols[1], 
+            z=numeric_cols[2],
+            color=anomaly_labels.astype(str),
+            title='3D Anomaly Visualization',
+            color_discrete_map={'0': 'blue', '1': 'red'}
+        )
+        return fig, fig_3d
     
-    return fig, score_fig
+    return fig
 
 # Fungsi untuk ekstraksi fitur
 def extract_features(df, features):
@@ -2248,7 +2348,7 @@ def train_anomaly_detection_model(df):
             # Save model with metadata
             model_path = os.path.join('models', f'anomaly_model_{method}_{pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")}.pkl')
             saved_path = save_anomaly_model(
-                results['model'], scaler, numeric_cols, method, contamination, model_path
+                results['model'], scaler, model_path
             )
             st.success(f"Model saved to: {saved_path}")
 
@@ -2644,15 +2744,13 @@ def predict_page():
             st.error(f"Error during prediction: {str(e)}")
             st.write("Please ensure your data is in the correct format and try again.")
 
-def save_anomaly_model(model, scaler, features, method, contamination, filepath):
+def save_anomaly_model(model, scaler, filepath):
     """Save trained anomaly detection model"""
     model_data = {
         'model': model,
         'scaler': scaler,
-        'features': features,
-        'method': method,
-        'contamination': contamination,
-        'timestamp': pd.Timestamp.now().isoformat()
+        'feature_names': None,  # Can be populated from training data
+        'timestamp': pd.Timestamp.now()
     }
     
     # Ensure directory exists
