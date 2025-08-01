@@ -1475,6 +1475,58 @@ def visualize_anomalies(df, anomaly_labels, anomaly_scores, method='isolation_fo
     
     return fig
 
+def convert_string_features_to_numeric(df, features):
+    """Convert string features to numeric, handling IP addresses and other formats"""
+    df_processed = df.copy()
+    valid_features = []
+    
+    for col in features:
+        if col not in df_processed.columns:
+            continue
+            
+        # Skip if already numeric
+        if pd.api.types.is_numeric_dtype(df_processed[col]):
+            valid_features.append(col)
+            continue
+            
+        try:
+            # Handle IP addresses by converting to integer
+            if df_processed[col].dtype == 'object':
+                # Check if column contains IP addresses
+                ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
+                if df_processed[col].astype(str).str.contains(ip_pattern, na=False).any():
+                    # Convert IP to integer
+                    def ip_to_int(ip_str):
+                        try:
+                            parts = ip_str.split('.')
+                            return (int(parts[0]) << 24) + (int(parts[1]) << 16) + (int(parts[2]) << 8) + int(parts[3])
+                        except:
+                            return 0
+                    
+                    df_processed[col] = df_processed[col].astype(str).apply(ip_to_int)
+                    valid_features.append(col)
+                    continue
+            
+            # Try to convert to numeric with coercion
+            df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce')
+            
+            # Handle any NaN values after conversion
+            if df_processed[col].isna().any():
+                # Fill with median for numeric columns
+                median_val = df_processed[col].median()
+                df_processed[col] = df_processed[col].fillna(median_val)
+                
+            # Check if we have valid numeric data
+            if not df_processed[col].isna().all():
+                valid_features.append(col)
+                
+        except Exception as e:
+            st.warning(f"Skipping column {col} due to conversion error: {str(e)}")
+            continue
+    
+    return df_processed, valid_features
+
+
 # Fungsi untuk ekstraksi fitur
 def extract_features(df, features):
     st.subheader("Feature Extraction and Selection")
@@ -2441,7 +2493,14 @@ def train_model_page():
                             selected_features.remove('Label')
                     
                     # Extract features and labels
-                    X = df[selected_features].values
+                    # Ensure all selected features are properly converted to numeric
+                    df_processed, valid_features = convert_string_features_to_numeric(df, selected_features)
+                    
+                    if len(valid_features) < 2:
+                        st.error("Not enough valid numeric features found. Please check your data.")
+                        return
+                    
+                    X = df_processed[valid_features].values.astype(float)
                     y = df['Label'].values
                     
                     # Convert labels to numeric if they're not already
