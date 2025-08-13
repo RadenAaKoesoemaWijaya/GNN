@@ -2444,38 +2444,38 @@ def train_model_page():
             perform_eda(df)
         
         # Feature extraction and selection
-    with st.expander("Feature Extraction and Selection", expanded=False):
-        df, selected_features = extract_features(df, df.columns.tolist())
-    
-    # Model training parameters
-    st.subheader("Model Training Parameters")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        hidden_channels = st.slider("Hidden Channels", 8, 256, 64, step=8)
-        num_layers = st.slider("Number of GNN Layers", 1, 5, 2)
-        dropout_rate = st.slider("Dropout Rate", 0.0, 0.8, 0.5, step=0.1)
-    
-    with col2:
-        learning_rate = st.number_input("Learning Rate", 0.0001, 0.1, 0.001, format="%.4f")
-        num_epochs = st.slider("Number of Epochs", 10, 500, 100)
-        batch_size = st.slider("Batch Size", 16, 256, 64, step=16)
-    
-    # Advanced parameters
-    with st.expander("Advanced Parameters", expanded=False):
-        weight_decay = st.number_input("Weight Decay", 0.0, 0.1, 0.0001, format="%.5f")
-        early_stopping = st.checkbox("Enable Early Stopping", value=True)
-        patience = st.slider("Patience for Early Stopping", 5, 50, 10) if early_stopping else 0
-        validation_split = st.slider("Validation Split", 0.1, 0.3, 0.2, step=0.05)
-        use_class_weights = st.checkbox("Use Class Weights for Imbalanced Data", value=True)
-    
-    # Anomaly detection option
-    use_anomaly_detection = st.checkbox("Use Anomaly Detection (Unsupervised)", value=False)
-    
-    if use_anomaly_detection:
-        train_anomaly_detection_model(df)
-        return
+        with st.expander("Feature Extraction and Selection", expanded=False):
+            df, selected_features = extract_features(df, df.columns.tolist())
+        
+        # Model training parameters
+        st.subheader("Model Training Parameters")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            hidden_channels = st.slider("Hidden Channels", 8, 256, 64, step=8)
+            num_layers = st.slider("Number of GNN Layers", 1, 5, 2)
+            dropout_rate = st.slider("Dropout Rate", 0.0, 0.8, 0.5, step=0.1)
+        
+        with col2:
+            learning_rate = st.number_input("Learning Rate", 0.0001, 0.1, 0.001, format="%.4f")
+            num_epochs = st.slider("Number of Epochs", 10, 500, 100)
+            batch_size = st.slider("Batch Size", 16, 256, 64, step=16)
+        
+        # Advanced parameters
+        with st.expander("Advanced Parameters", expanded=False):
+            weight_decay = st.number_input("Weight Decay", 0.0, 0.1, 0.0001, format="%.5f")
+            early_stopping = st.checkbox("Enable Early Stopping", value=True)
+            patience = st.slider("Patience for Early Stopping", 5, 50, 10) if early_stopping else 0
+            validation_split = st.slider("Validation Split", 0.1, 0.3, 0.2, step=0.05)
+            use_class_weights = st.checkbox("Use Class Weights for Imbalanced Data", value=True)
+        
+        # Anomaly detection option
+        use_anomaly_detection = st.checkbox("Use Anomaly Detection (Unsupervised)", value=False)
+        
+        if use_anomaly_detection:
+            train_anomaly_detection_model(df)
+            return
     
     # Start training
     if st.button("Train Model"):
