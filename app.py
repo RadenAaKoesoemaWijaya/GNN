@@ -2471,11 +2471,11 @@ def train_model_page():
             use_class_weights = st.checkbox("Use Class Weights for Imbalanced Data", value=True)
         
         # Anomaly detection option
-        use_anomaly_detection = st.checkbox("Use Anomaly Detection (Unsupervised)", value=False)
-        
-        if use_anomaly_detection:
-            train_anomaly_detection_model(df)
-            return
+    use_anomaly_detection = st.checkbox("Use Anomaly Detection (Unsupervised)", value=False)
+    
+    if use_anomaly_detection:
+        train_anomaly_detection_model(df)
+        return
     
     # Start training
     if st.button("Train Model"):
