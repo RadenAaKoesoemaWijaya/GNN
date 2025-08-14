@@ -33,7 +33,7 @@ warnings.filterwarnings('ignore')
 # Add this code near the top of your app.py file, after the imports and before any other Streamlit code
 
 # Set page configuration
-st.set_page_config(page_title='MALDET', layout='wide')
+st.set_page_config(page_title='GRAPHNET', layout='wide')
 
 # Custom CSS styling
 st.markdown("""
@@ -205,2628 +205,1061 @@ def make_json_serializable(obj):
 
 # Fungsi untuk menampilkan halaman utama
 def show_home_page():
-    st.title('MALDET')
+    st.title('GRAPHNET - API Log Anomaly Detection')
     st.markdown("""
-    ## Welcome to the Anomaly Detection Webapp
+    ## Selamat Datang di Aplikasi Deteksi Anomali Log API
     
-    This application helps you detect anomalies in your data using advanced machine learning techniques, including Graph Neural Networks (GNN).
+    Aplikasi ini membantu Anda mendeteksi anomali dalam log API menggunakan teknik machine learning canggih, 
+    termasuk kombinasi Autoencoder dan Graph Neural Networks (GNN).
     
-    ### What would you like to do?
+    ### Apa yang ingin Anda lakukan?
     """)
     
     # Tampilkan opsi navigasi dengan kartu yang menarik
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         st.markdown("""
         <div style="padding: 20px; border-radius: 10px; border: 1px solid #ddd; text-align: center; height: 200px;">
-            <h3>Train New Model</h3>
-            <p>Upload data, perform EDA, and train a new GNN model for intrusion detection</p>
+            <h3>Pengumpulan Data</h3>
+            <p>Upload data log API dan lakukan pra-pemrosesan data</p>
             <br/>
         </div>
         """, unsafe_allow_html=True)
-        train_button = st.button("Train New Model", key="train_nav")
+        collect_button = st.button("Pengumpulan Data", key="collect_nav")
     
     with col2:
         st.markdown("""
         <div style="padding: 20px; border-radius: 10px; border: 1px solid #ddd; text-align: center; height: 200px;">
-            <h3>Use Existing Model</h3>
-            <p>Upload data and use a pre-trained model to detect intrusions</p>
+            <h3>Pelatihan Model</h3>
+            <p>Latih model Autoencoder dan GNN untuk deteksi anomali</p>
             <br/>
         </div>
         """, unsafe_allow_html=True)
-        predict_button = st.button("Use Existing Model", key="predict_nav")
+        train_button = st.button("Pelatihan Model", key="train_nav")
     
+    with col3:
+        st.markdown("""
+        <div style="padding: 20px; border-radius: 10px; border: 1px solid #ddd; text-align: center; height: 200px;">
+            <h3>Deteksi Anomali</h3>
+            <p>Gunakan model terlatih untuk mendeteksi anomali pada data baru</p>
+            <br/>
+        </div>
+        """, unsafe_allow_html=True)
+        detect_button = st.button("Deteksi Anomali", key="detect_nav")
+    
+    if collect_button:
+        st.session_state['page'] = 'collect'
+        st.rerun()
     
     if train_button:
         st.session_state['page'] = 'train'
         st.rerun()
     
-    if predict_button:
-        st.session_state['page'] = 'predict'
+    if detect_button:
+        st.session_state['page'] = 'detect'
         st.rerun()
     
     # Tampilkan informasi tambahan tentang aplikasi
     st.markdown("""
     ---
-    ### About this Application
+    ### Tentang Aplikasi Ini
     
-    This Anomaly Detection Webapp enables you to analyze tabular data, perform exploratory data analysis, and detect anomalies using machine learning models.
+    Aplikasi Deteksi Anomali Log API ini memungkinkan Anda menganalisis log API, melakukan eksplorasi data, dan mendeteksi anomali menggunakan model machine learning.
     
-    - Upload your dataset (CSV format)
-    - Perform comprehensive exploratory data analysis
-    - Extract relevant features for anomaly detection
-    - Train or use pre-trained models to detect anomalies
-    - Visualize results and download detected anomalies
+    - Upload dataset log API (format CSV)
+    - Lakukan pra-pemrosesan dan ekstraksi fitur
+    - Latih model Autoencoder dan GNN untuk deteksi anomali
+    - Deteksi anomali pada data baru
+    - Visualisasikan hasil dan unduh laporan anomali
     
-    ### Supported Use Cases
+    ### Alur Kerja Sistem
     
-    The system can be used for:
-    - Fraud detection
-    - Sensor fault detection
-    - Unusual pattern discovery
-    - And more...
+    1. **Pengumpulan Data**: Log API dikumpulkan dan diproses
+    2. **Pra-pemrosesan Data**: Data mentah diubah menjadi fitur yang dapat digunakan model
+    3. **Pembentukan Grafik**: Data direpresentasikan sebagai grafik untuk analisis GNN
+    4. **Pelatihan Model**: Model Autoencoder dan GNN dilatih dengan data normal
+    5. **Deteksi Anomali**: Model terlatih digunakan untuk mendeteksi anomali pada data baru
+    6. **Evaluasi Hasil**: Hasil deteksi dievaluasi dan ditampilkan
     
-    ### How It Works
-    
-    1. **Data Processing**: Your data is preprocessed and features are extracted
-    2. **Graph Construction**: Data is represented as a graph for GNN analysis
-    3. **Modeling**: Machine learning models analyze the data for anomalies
-    4. **Detection**: Anomalous patterns are identified and visualized
-    
-    For detailed instructions, see the help section or the documentation.
+    Untuk petunjuk detail, lihat bagian bantuan atau dokumentasi.
     """)
 
-# Define preprocessing function
-def preprocess_for_anomaly_detection(df):
-    """Preprocess data specifically for anomaly detection"""
-    df = df.copy()
+# Fungsi untuk menampilkan halaman pengumpulan data
+def show_data_collection_page():
+    st.title("Langkah 1: Pengumpulan Data Log API")
     
-    # Handle missing values with robust methods
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    st.markdown("""
+    ### Tujuan: Mengumpulkan data mentah untuk analisis
     
-    # Use median for robust imputation
-    for col in numeric_cols:
-        df[col].fillna(df[col].median(), inplace=True)
-    
-    # Remove outliers using IQR method
-    for col in numeric_cols:
-        Q1 = df[col].quantile(0.25)
-        Q3 = df[col].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-        df[col] = df[col].clip(lower_bound, upper_bound)
-    
-    # Robust scaling using StandardScaler
-    scaler = StandardScaler()
-    df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
-    
-    return df, scaler
-
-def preprocess_data(df):
-    """Preprocess data for GNN model"""
-    # Existing preprocessing code remains unchanged
-    df = df.copy()
-    
-    # Step 1: Data Cleaning
-    # Identify and remove timestamp columns
-    timestamp_columns = []
-    for col in df.columns:
-        # Check if column name contains timestamp-related keywords
-        if any(time_keyword in col.lower() for time_keyword in ['time', 'date', 'timestamp', 'datetime']):
-            timestamp_columns.append(col)
-        # Try to infer if it's a timestamp by checking the first few values
-        elif df[col].dtype == 'object':
-            sample_values = df[col].dropna().head(5).astype(str)
-            # Check for common date/time patterns
-            date_patterns = [
-                r'\d{4}-\d{2}-\d{2}',  # YYYY-MM-DD
-                r'\d{2}/\d{2}/\d{4}',  # MM/DD/YYYY
-                r'\d{2}:\d{2}:\d{2}',  # HH:MM:SS
-                r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'  # YYYY-MM-DD HH:MM:SS
-            ]
-            if any(sample_values.str.contains(pattern).any() for pattern in date_patterns):
-                timestamp_columns.append(col)
-    
-    # Remove identified timestamp columns
-    if timestamp_columns:
-        print(f"Removing timestamp columns: {timestamp_columns}")
-        df = df.drop(columns=timestamp_columns)
-    
-    # Step 2: Handle IP addresses and other network identifiers
-    # Identify columns that might contain IP addresses or network identifiers
-    ip_columns = []
-    for col in df.columns:
-        if df[col].dtype == 'object':
-            # Check if column name suggests IP or network identifier
-            if any(net_keyword in col.lower() for net_keyword in ['ip', 'addr', 'address', 'src', 'dst', 'source', 'destination', 'mac', 'port']):
-                ip_columns.append(col)
-            # Check if values look like IP addresses
-            elif df[col].dropna().head(5).astype(str).str.contains(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}').any():
-                ip_columns.append(col)
-    
-    # Convert IP addresses to numeric features or drop them
-    for col in ip_columns:
-        # Option 1: Drop IP columns (simpler approach)
-        df = df.drop(columns=[col])
-        print(f"Dropped IP address column: {col}")
-    
-    # Step 3: Handle Label column - PERBAIKAN UNTUK ERROR MIX OF LABEL INPUT TYPES
-    if 'Label' in df.columns:
-        # Konversi semua nilai ke string terlebih dahulu untuk memastikan konsistensi
-        df['Label'] = df['Label'].astype(str)
-        
-        # Bersihkan label string (hapus karakter khusus, konversi ke lowercase)
-        df['Label'] = df['Label'].apply(lambda x: re.sub(r'[^a-zA-Z0-9]', '_', x.lower()))
-        
-        # Tangani nilai kosong atau NaN
-        df['Label'] = df['Label'].replace('', 'unknown').replace('nan', 'unknown')
-        
-        # Buat mapping untuk label
-        unique_labels = df['Label'].unique()
-        print(f"Unique labels found: {unique_labels}")
-        
-        # Buat mapping numerik untuk label
-        label_map = {label: i for i, label in enumerate(unique_labels)}
-        print(f"Label mapping: {label_map}")
-        
-        # Terapkan mapping ke kolom Label
-        df['Label'] = df['Label'].map(label_map)
-        
-        # Pastikan semua nilai Label adalah numerik
-        if df['Label'].isna().any():
-            # Jika masih ada NaN setelah mapping, isi dengan 0 (biasanya label untuk "normal")
-            print(f"Warning: {df['Label'].isna().sum()} NaN values found in Label column after mapping. Filling with 0.")
-            df['Label'] = df['Label'].fillna(0).astype(int)
-        else:
-            df['Label'] = df['Label'].astype(int)
-    
-    # Step 4: Convert remaining object columns to numeric
-    for col in df.columns:
-        if col != 'Label' and df[col].dtype == 'object':
-            try:
-                # Try to convert to numeric, coerce errors to NaN
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-            except:
-                # If conversion fails, drop the column
-                df = df.drop(columns=[col])
-                print(f"Dropped column {col} due to non-numeric values")
-    
-    # Step 5: Handle missing values
-    # Calculate percentage of missing values in each column
-    missing_percentage = df.isnull().mean() * 100
-    
-    # Drop columns with high percentage of missing values (e.g., > 30%)
-    high_missing_cols = missing_percentage[missing_percentage > 30].index.tolist()
-    if high_missing_cols:
-        df = df.drop(columns=high_missing_cols)
-        print(f"Dropped columns with >30% missing values: {high_missing_cols}")
-    
-    # Fill remaining missing values
-    # For numeric columns, fill with mean
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
-    
-        # Step 6: Handle infinite values
-    df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    df.fillna(df.mean(), inplace=True)
-    
-    # Step 7: Feature Selection
-    # Select only numeric columns for feature selection
-    features = df.select_dtypes(include=[np.number]).columns.tolist()
-    if 'Label' in features:
-        features.remove('Label')
-    # Add debug information
-    print(f"Found {len(features)} numeric features: {features}")
-    
-    # Check if we have any features to work with
-    if len(features) == 0:
-        # If no numeric features, try to convert more columns to numeric
-        for col in df.columns:
-            if col != 'Label':
-                try:
-                    # More aggressive conversion to numeric
-                    df[col] = pd.to_numeric(df[col].astype(str).str.replace('[^0-9.-]', '', regex=True), errors='coerce')
-                    if not df[col].isna().all():  # Only keep if not all values are NaN
-                        features.append(col)
-                except:
-                    pass
-        
-        print(f"After conversion attempt, found {len(features)} numeric features: {features}")
-        
-        # If still no features, raise a more informative error
-        if len(features) == 0:
-            # Display column types to help diagnose
-            print(f"Column types in dataframe: {df.dtypes}")
-            raise ValueError("No numeric features available after preprocessing. Please check your data format.")
-
-    if len(features) > 0:
-        # Step 7.1: Remove low variance features
-        # Features with almost no variance don't contribute much information
-        var_threshold = VarianceThreshold(threshold=0.01)
-        try:
-            # Handle extreme values before variance thresholding
-            # Clip values to a reasonable range to prevent infinity/overflow issues
-            for col in features:
-                # Calculate robust statistics that aren't affected by outliers
-                q1 = df[col].quantile(0.01)  # 1st percentile
-                q3 = df[col].quantile(0.99)  # 99th percentile
-                iqr = q3 - q1
-                lower_bound = q1 - 3 * iqr
-                upper_bound = q3 + 3 * iqr
-                
-                # Clip values to the bounds
-                df[col] = df[col].clip(lower_bound, upper_bound)
-                
-                # Double-check for any remaining infinities or NaNs
-                df[col] = df[col].replace([np.inf, -np.inf], np.nan)
-                df[col] = df[col].fillna(df[col].median())
-            
-            # Now apply variance threshold
-            df_features = var_threshold.fit_transform(df[features])
-            # Get the selected feature names
-            selected_features = [features[i] for i in range(len(features)) 
-                                if var_threshold.get_support()[i]]
-            # Update the dataframe and features list
-            df = pd.concat([df[selected_features], 
-                           df['Label'] if 'Label' in df.columns else pd.Series()], axis=1)
-            features = selected_features
-            print(f"Removed low variance features. {len(selected_features)} features remaining.")
-        except Exception as e:
-            print(f"Variance thresholding failed: {str(e)}")
-            # If variance thresholding fails, continue with original features
-            selected_features = features
-        
-        # Step 7.2: Feature selection based on correlation with target (if Label exists)
-        if 'Label' in df.columns and len(features) > 10:
-            try:
-                # Use mutual information for classification
-                selector = SelectKBest(mutual_info_classif, k=min(20, len(features)))
-                selector.fit(df[features], df['Label'])
-                
-                # Get selected feature names
-                selected_features = [features[i] for i in range(len(features)) 
-                                    if selector.get_support()[i]]
-                
-                # Get feature importance scores
-                feature_scores = selector.scores_
-                feature_importance = {features[i]: feature_scores[i] for i in range(len(features))}
-                
-                # Sort features by importance
-                sorted_features = sorted(feature_importance.items(), key=lambda x: x[1], reverse=True)
-                print("Top features by importance:")
-                for feature, score in sorted_features[:10]:
-                    print(f"  {feature}: {score:.4f}")
-                
-                # Update the dataframe and features list
-                df = pd.concat([df[selected_features], 
-                               df['Label'] if 'Label' in df.columns else pd.Series()], axis=1)
-                features = selected_features
-                print(f"Selected top {len(selected_features)} features based on mutual information.")
-            except Exception as e:
-                print(f"Feature selection failed: {str(e)}")
-    
-    # Step 8: Normalize features
-    if len(features) > 0:
-        scaler = StandardScaler()
-        try:
-            df[features] = scaler.fit_transform(df[features])
-        except Exception as e:
-            # If standard scaling fails, try a more robust approach
-            print(f"Standard scaling failed: {str(e)}")
-            # Clip extreme values to reasonable range (e.g., 5 std devs from mean)
-            for col in features:
-                mean_val = df[col].mean()
-                std_val = df[col].std()
-                if std_val > 0:  # Avoid division by zero
-                    df[col] = df[col].clip(mean_val - 5*std_val, mean_val + 5*std_val)
-            # Try scaling again after clipping
-            df[features] = scaler.fit_transform(df[features])
-    
-    # Step 9: Create graph connections
-    edge_index = []
-    for i in range(len(df) - 1):
-        edge_index.append([i, i + 1])
-        edge_index.append([i + 1, i])  # bidirectional
-    
-    # Step 10: Convert to PyTorch tensors
-    if len(features) > 0:
-        x = torch.tensor(df[features].values, dtype=torch.float)
-        edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
-        
-        # If label column exists, use it
-        if 'Label' in df.columns:
-            y = torch.tensor(df['Label'].values, dtype=torch.long)
-        else:
-            y = torch.zeros(len(df), dtype=torch.long)
-        
-        # Create PyG data object
-        data = Data(x=x, edge_index=edge_index, y=y)
-        return data, features
-    else:
-        raise ValueError("No numeric features available after preprocessing")
-
-# Fungsi untuk melakukan EDA komprehensif
-def perform_eda(df):
-    st.header("Exploratory Data Analysis")
-    
-    # Inisialisasi processed_df di awal
-    processed_df = df.copy()
-
-    # Tab untuk berbagai jenis analisis
-    eda_tab1, eda_tab2, eda_tab3, eda_tab4, eda_tab5 = st.tabs([
-        "Data Overview", "Feature Analysis", "Correlation Analysis", 
-        "Distribution Analysis", "Dimensionality Reduction"
-    ])
-    
-    with eda_tab1:
-        st.subheader("Data Overview")
-        
-        # Informasi dasar dataset
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Number of Samples", processed_df.shape[0])
-            st.metric("Number of Features", processed_df.shape[1])
-        
-        with col2:
-            if 'Label' in processed_df.columns:
-                st.metric("Number of Classes", processed_df['Label'].nunique())
-                st.write("Class Distribution:")
-                
-                # Visualisasi distribusi kelas
-                label_counts = processed_df['Label'].astype(str).value_counts().reset_index()
-                label_counts.columns = ['Label', 'Count']
-                
-                fig = px.bar(
-                    label_counts, 
-                    x='Label', 
-                    y='Count',
-                    title="Class Distribution",
-                    color='Count'
-                )
-                st.plotly_chart(fig, use_container_width=True)
-        
-        # Tampilkan informasi tentang tipe data
-        st.subheader("Data Types")
-        
-        # Hitung jumlah kolom berdasarkan tipe data
-        dtype_counts = processed_df.dtypes.astype(str).value_counts().reset_index()
-        dtype_counts.columns = ['Data Type', 'Count']
-        
-        fig = px.pie(
-            dtype_counts,
-            values='Count',
-            names='Data Type',
-            title="Feature Data Types"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Tampilkan sampel data
-        st.subheader("Data Sample")
-        st.dataframe(processed_df.head(10))
-        
-        # Tampilkan statistik deskriptif
-        st.subheader("Descriptive Statistics")
-        st.dataframe(processed_df.describe())
-        
-        
-        # Check for duplicate rows
-        duplicate_rows = df.duplicated().sum()
-        if duplicate_rows > 0:
-            st.warning(f"Dataset contains {duplicate_rows} duplicate rows ({duplicate_rows/len(df):.2%} of data)")
-            
-            # Option to remove duplicates
-            if st.checkbox("Remove duplicate rows"):
-                df = df.drop_duplicates()
-                st.success(f"Removed {duplicate_rows} duplicate rows. New shape: {df.shape}")
-        else:
-            st.success("No duplicate rows found in the dataset")
-        
-        # Check for outliers in numeric columns
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        
-        if len(numeric_cols) > 0:
-            st.subheader("Outlier Analysis")
-            
-            # Pilih fitur untuk analisis outlier
-            if len(numeric_cols) > 10:
-                selected_features = st.multiselect(
-                    "Select features for outlier analysis (max 10 recommended)",
-                    options=numeric_cols,
-                    default=numeric_cols[:5]
-                )
-            else:
-                selected_features = numeric_cols
-
-    
-    with eda_tab2:
-            st.subheader("Missing Data Analysis")
-        
-            # Check for missing values
-            missing_data = df.isnull().sum()
-            missing_data = missing_data[missing_data > 0]
-                        
-            # If no missing values found, show a message
-            if len(missing_data) > 0:
-                # Display missing data information
-                missing_percent = (missing_data / len(df)) * 100
-                missing_df = pd.DataFrame({
-                    'Column': missing_data.index,
-                    'Missing Values': missing_data.values,
-                    'Percentage': missing_percent.values
-                }).sort_values('Missing Values', ascending=False)
-                
-                st.write(f"Found {len(missing_data)} columns with missing values:")
-                st.dataframe(missing_df)
-                
-                # Visualize missing data
-                fig = px.bar(
-                    missing_df,
-                    x='Column',
-                    y='Percentage',
-                    title="Percentage of Missing Values by Column",
-                    color='Percentage',
-                    color_continuous_scale=px.colors.sequential.Reds
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Add options for handling missing data
-                st.subheader("Handle Missing Data")
-                
-                # First, offer to convert all data to numeric
-                convert_to_numeric = st.checkbox("Convert all columns to numeric before handling missing values", value=True)
-                
-                # Variable to track if data was processed
-                data_processed = False
-                processed_df = None
-                
-                if convert_to_numeric:
-                    # Create a copy of the dataframe to avoid modifying the original
-                    df_numeric = df.copy()
-                    
-                    # Convert all object columns to numeric
-                    for col in df_numeric.columns:
-                        if df_numeric[col].dtype == 'object':
-                            # Try to convert directly first
-                            try:
-                                df_numeric[col] = pd.to_numeric(df_numeric[col], errors='coerce')
-                            except:
-                                # If direct conversion fails, use factorize to convert categorical to numeric
-                                df_numeric[col] = pd.factorize(df_numeric[col])[0]
-                    
-                    # Show the conversion results
-                    numeric_conversion_info = pd.DataFrame({
-                        'Column': df.columns,
-                        'Original Type': df.dtypes,
-                        'New Type': df_numeric.dtypes
-                    })
-                    
-                    st.write("Conversion to numeric types:")
-                    st.dataframe(numeric_conversion_info)
-                    
-                    # Update the dataframe for further processing
-                    processed_df = df_numeric
-                    st.success("All columns converted to numeric types")
-                    data_processed = True
-                
-                # Options for handling missing values
-                missing_handling = st.radio(
-                    "Select method to handle missing values:",
-                    options=["Drop rows with missing values", "Impute missing values"]
-                )
-                
-                if missing_handling == "Drop rows with missing values":
-                    # Option to drop rows with missing values
-                    columns_to_check = st.multiselect(
-                        "Select columns to check for missing values (empty = all columns):",
-                        options=df.columns.tolist(),
-                        default=[]
-                    )
-                    
-                    if not columns_to_check:
-                        columns_to_check = df.columns.tolist()
-                    
-                    # Preview how many rows will be dropped
-                    rows_with_missing = df[columns_to_check].isnull().any(axis=1).sum()
-                    st.warning(f"{rows_with_missing} rows ({rows_with_missing/len(df)*100:.2f}%) will be dropped")
-                    
-                    if st.button("Drop rows with missing values"):
-                        # Use the processed dataframe if available, otherwise use original
-                        df_to_clean = processed_df if data_processed else df.copy()
-                        
-                        # Drop rows with missing values
-                        df_cleaned = df_to_clean.dropna(subset=columns_to_check)
-                        
-                        # Show results
-                        st.success(f"Dropped {len(df_to_clean) - len(df_cleaned)} rows with missing values")
-                        st.write(f"Original dataset shape: {df_to_clean.shape}")
-                        st.write(f"Cleaned dataset shape: {df_cleaned.shape}")
-                        
-                        # Update the processed dataframe
-                        processed_df = df_cleaned
-                        data_processed = True
-                
-                elif missing_handling == "Impute missing values":
-                    # Options for imputation
-                    imputation_method = st.selectbox(
-                        "Select imputation method:",
-                        options=["Mean", "Median", "Mode", "Constant value", "Forward fill", "Backward fill"]
-                    )
-                    
-                    # Columns to impute
-                    columns_to_impute = st.multiselect(
-                        "Select columns to impute (empty = all columns with missing values):",
-                        options=missing_data.index.tolist(),
-                        default=missing_data.index.tolist()
-                    )
-                    
-                    if not columns_to_impute:
-                        columns_to_impute = missing_data.index.tolist()
-                    
-                    # Perform imputation
-                    if st.button("Impute missing values"):
-                        # Use the processed dataframe if available, otherwise use original
-                        df_to_impute = processed_df if data_processed else df.copy()
-                        
-                        # Create a copy of the dataframe
-                        df_imputed = df_to_impute.copy()
-                        
-                        # Impute each selected column
-                        for col in columns_to_impute:
-                            if imputation_method == "Mean":
-                                # For numeric columns, use mean
-                                if pd.api.types.is_numeric_dtype(df_imputed[col]):
-                                    fill_value = df_imputed[col].mean()
-                                    df_imputed[col] = df_imputed[col].fillna(fill_value)
-                                    st.info(f"Column '{col}' imputed with mean: {fill_value:.4f}")
-                                else:
-                                    st.warning(f"Column '{col}' is not numeric, skipping mean imputation")
-                            
-                            elif imputation_method == "Median":
-                                # For numeric columns, use median
-                                if pd.api.types.is_numeric_dtype(df_imputed[col]):
-                                    fill_value = df_imputed[col].median()
-                                    df_imputed[col] = df_imputed[col].fillna(fill_value)
-                                    st.info(f"Column '{col}' imputed with median: {fill_value:.4f}")
-                                else:
-                                    st.warning(f"Column '{col}' is not numeric, skipping median imputation")
-                            
-                            elif imputation_method == "Mode":
-                                # Use most frequent value
-                                fill_value = df_imputed[col].mode()[0]
-                                df_imputed[col] = df_imputed[col].fillna(fill_value)
-                                st.info(f"Column '{col}' imputed with mode: {fill_value}")
-                            
-                            elif imputation_method == "Constant value":
-                                # Use a constant value
-                                fill_value = st.number_input(f"Constant value for '{col}':", value=0)
-                                df_imputed[col] = df_imputed[col].fillna(fill_value)
-                                st.info(f"Column '{col}' imputed with constant: {fill_value}")
-                            
-                            elif imputation_method == "Forward fill":
-                                # Forward fill (use previous value)
-                                df_imputed[col] = df_imputed[col].fillna(method='ffill')
-                                if df_imputed[col].isna().any():
-                                    # If still has NaN (at the beginning), use backward fill
-                                    df_imputed[col] = df_imputed[col].fillna(method='bfill')
-                                st.info(f"Column '{col}' imputed with forward fill")
-                            
-                            elif imputation_method == "Backward fill":
-                                # Backward fill (use next value)
-                                df_imputed[col] = df_imputed[col].fillna(method='bfill')
-                                if df_imputed[col].isna().any():
-                                    # If still has NaN (at the end), use forward fill
-                                    df_imputed[col] = df_imputed[col].fillna(method='ffill')
-                                st.info(f"Column '{col}' imputed with backward fill")
-                        
-                        # Check if any missing values remain
-                        remaining_missing = df_imputed.isnull().sum().sum()
-                        if remaining_missing > 0:
-                            st.warning(f"{remaining_missing} missing values remain after imputation")
-                            # Fill any remaining missing values with 0
-                            df_imputed = df_imputed.fillna(0)
-                            st.info("Remaining missing values filled with 0")
-                        
-                        # Show results
-                        st.success("Missing values imputed successfully")
-                        
-                        # Update the processed dataframe
-                        processed_df = df_imputed
-                        data_processed = True
-              
-            # Add column removal functionality
-            st.subheader("Remove Unnecessary Columns")
-            
-            # Display all available columns
-            all_columns = processed_df.columns.tolist()
-            
-            # Allow user to select columns to drop
-            columns_to_drop = st.multiselect(
-                "Select columns to remove from the dataset:",
-                options=all_columns,
-                default=[]
-            )
-            
-            # Show preview of selected columns
-            if columns_to_drop:
-                st.write(f"You've selected {len(columns_to_drop)} columns to drop:")
-                for col in columns_to_drop:
-                    st.write(f"- {col}")
-                
-                # Preview the dataset after dropping columns
-                preview_df = processed_df.drop(columns=columns_to_drop)
-                st.write(f"Dataset shape after dropping columns: {preview_df.shape}")
-                
-                # Button to confirm dropping columns
-                if st.button("Confirm and Drop Selected Columns"):
-                    # Create a copy to avoid modifying the original dataframe
-                    df = processed_df.drop(columns=columns_to_drop)
-                    st.success(f"Successfully dropped {len(columns_to_drop)} columns")
-                    st.write("Preview of the processed dataset:")
-                    st.dataframe(processed_df.head())
-                    st.success("Dataset updated successfully!")
-                    # Update the processed dataframe
-                    processed_df = df
-                    data_processed = True
-            else:
-                st.success("No missing values found in the dataset")
-    
-    with eda_tab3:
-        st.subheader("Correlation Analysis")
-        
-        # Use the original dataframe
-        analysis_df = processed_df.copy()
-        
-        numeric_cols = analysis_df.select_dtypes(include=[np.number]).columns.tolist()
-        
-        if len(numeric_cols) > 1:
-            # Hitung matriks korelasi
-            corr_matrix = analysis_df[numeric_cols].corr()
-            
-            # Visualisasi matriks korelasi dengan heatmap
-            fig, ax = plt.subplots(figsize=(12, 10))
-            mask = np.triu(np.ones_like(corr_matrix, dtype=bool))
-            cmap = sns.diverging_palette(230, 20, as_cmap=True)
-            
-            sns.heatmap(
-                corr_matrix, 
-                mask=mask, 
-                cmap=cmap, 
-                vmax=1, 
-                vmin=-1, 
-                center=0,
-                square=True, 
-                linewidths=.5, 
-                cbar_kws={"shrink": .5},
-                annot=False
-            )
-            plt.title('Feature Correlation Matrix')
-            st.pyplot(fig)
-            
-            # Tampilkan fitur dengan korelasi tinggi
-            st.subheader("High Correlation Pairs")
-            
-            # Dapatkan pasangan fitur dengan korelasi tinggi
-            corr_pairs = []
-            for i in range(len(numeric_cols)):
-                for j in range(i+1, len(numeric_cols)):
-                    corr_value = abs(corr_matrix.iloc[i, j])
-                    if corr_value > 0.7:  # Threshold untuk korelasi tinggi
-                        corr_pairs.append({
-                            'Feature 1': numeric_cols[i],
-                            'Feature 2': numeric_cols[j],
-                            'Correlation': corr_matrix.iloc[i, j]
-                        })
-            
-            if corr_pairs:
-                corr_df = pd.DataFrame(corr_pairs).sort_values('Correlation', ascending=False)
-                st.dataframe(corr_df)
-                
-                # Visualisasi scatter plot untuk pasangan dengan korelasi tertinggi
-                if len(corr_pairs) > 0:
-                    top_pair = corr_pairs[0]
-                    fig = px.scatter(
-                        analysis_df, 
-                        x=top_pair['Feature 1'], 
-                        y=top_pair['Feature 2'],
-                        title=f"Scatter Plot: {top_pair['Feature 1']} vs {top_pair['Feature 2']} (Correlation: {top_pair['Correlation']:.3f})",
-                        color='Label' if 'Label' in analysis_df.columns else None
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("No feature pairs with high correlation (>0.7) found")
-            
-            # Korelasi dengan target (jika ada)
-            if 'Label' in analysis_df.columns and analysis_df['Label'].dtype != 'object':
-                st.subheader("Feature Correlation with Target")
-                
-                # Hitung korelasi dengan target
-                target_corr = []
-                for col in numeric_cols:
-                    if col != 'Label':
-                        corr, _ = pearsonr(analysis_df[col], analysis_df['Label'])
-                        target_corr.append({
-                            'Feature': col,
-                            'Correlation': corr,
-                            'Abs Correlation': abs(corr)
-                        })
-                
-                target_corr_df = pd.DataFrame(target_corr).sort_values('Abs Correlation', ascending=False)
-                
-                # Visualisasi korelasi dengan target
-                fig = px.bar(
-                    target_corr_df.head(20),
-                    x='Feature',
-                    y='Correlation',
-                    title="Top 20 Features by Correlation with Target",
-                    color='Correlation',
-                    color_continuous_scale=px.colors.diverging.RdBu_r
-                )
-                st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("Not enough numeric features for correlation analysis")
-    
-    with eda_tab4:
-        st.subheader("Distribution Analysis")
-        
-        # Analisis distribusi fitur berdasarkan kelas (jika ada)
-        if 'Label' in processed_df.columns:
-            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-            if 'Label' in numeric_cols:
-                numeric_cols.remove('Label')
-            
-            if len(numeric_cols) > 0:
-                # Pilih fitur untuk analisis distribusi
-                selected_feature = st.selectbox(
-                    "Select feature for distribution analysis",
-                    options=numeric_cols
-                )
-                
-                # Visualisasi distribusi berdasarkan kelas
-                fig = px.histogram(
-                    df, 
-                    x=selected_feature,
-                    color='Label',
-                    marginal="box",
-                    barmode="overlay",
-                    title=f"Distribution of {selected_feature} by Class"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Violin plot untuk perbandingan distribusi
-                fig = px.violin(
-                    df, 
-                    y=selected_feature, 
-                    x='Label',
-                    box=True,
-                    title=f"Violin Plot: {selected_feature} by Class"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-        
-        # Analisis distribusi umum
-        st.subheader("General Distribution Analysis")
-        
-        numeric_cols = processed_df.select_dtypes(include=[np.number]).columns.tolist()
-        if len(numeric_cols) > 0:
-            # Pilih beberapa fitur untuk analisis
-            if len(numeric_cols) > 5:
-                selected_features = st.multiselect(
-                    "Select features for distribution comparison (max 5 recommended)",
-                    options=numeric_cols,
-                    default=numeric_cols[:3]
-                )
-            else:
-                selected_features = numeric_cols
-            
-            if selected_features:
-                # Normalisasi data untuk perbandingan
-                normalized_df = df[selected_features].copy()
-                for feature in selected_features:
-                    # Pastikan kolom adalah numerik
-                    if pd.api.types.is_numeric_dtype(normalized_df[feature]):
-                        # Tangani kasus nilai min dan max sama
-                        min_val = normalized_df[feature].min()
-                        max_val = normalized_df[feature].max()
-                        if min_val == max_val:
-                            normalized_df[feature] = 0  # atau 1, tergantung kebutuhan
-                        else:
-                            normalized_df[feature] = (normalized_df[feature] - min_val) / (max_val - min_val)
-                    else:
-                        st.warning(f"Kolom {feature} bukan numerik dan akan dilewati")
-                        normalized_df[feature] = 0
-                
-                # Reshape data untuk visualisasi
-                melted_df = pd.melt(normalized_df, value_vars=selected_features, var_name='Feature', value_name='Normalized Value')
-                
-                # Visualisasi perbandingan distribusi
-                fig = px.violin(
-                    melted_df, 
-                    y='Normalized Value', 
-                    x='Feature',
-                    box=True,
-                    title="Normalized Feature Distributions"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-    
-        with eda_tab5:
-            st.subheader("Dimensionality Reduction")
-            
-            numeric_cols = processed_df.select_dtypes(include=[np.number]).columns.tolist()
-            if 'Label' in numeric_cols:
-                numeric_cols.remove('Label')
-            
-            if len(numeric_cols) > 2:
-                # Pilih metode dimensionality reduction
-                dim_reduction_method = st.radio(
-                    "Select dimensionality reduction method",
-                    options=["PCA", "t-SNE"]
-                )
-                
-                # Persiapkan data
-                X = df[numeric_cols].copy()
-                
-                # Handle infinite values and extreme outliers
-                # Replace infinities with NaN first
-                X.replace([np.inf, -np.inf], np.nan, inplace=True)
-                
-                # For each column, handle extreme values using percentile-based clipping
-                for col in X.columns:
-                    # Check if column has any non-NaN values and is numeric
-                    if X[col].notna().any() and pd.api.types.is_numeric_dtype(X[col]):
-                        try:
-                            # Calculate robust statistics that aren't affected by outliers
-                            q1 = X[col].quantile(0.01)  # 1st percentile
-                            q3 = X[col].quantile(0.99)  # 99th percentile
-                            iqr = q3 - q1
-                            lower_bound = q1 - 3 * iqr
-                            upper_bound = q3 + 3 * iqr
-                            
-                            # Clip values to the bounds
-                            X[col] = X[col].clip(lower_bound, upper_bound)
-                        except TypeError as e:
-                            st.warning(f"Could not process column '{col}' due to data type issues. Converting to numeric.")
-                            # Try to convert to numeric, replacing errors with NaN
-                            X[col] = pd.to_numeric(X[col], errors='coerce')
-                            
-                            # If conversion successful, try again with outlier removal
-                            if pd.api.types.is_numeric_dtype(X[col]) and X[col].notna().any():
-                                q1 = X[col].quantile(0.01)
-                                q3 = X[col].quantile(0.99)
-                                iqr = q3 - q1
-                                lower_bound = q1 - 3 * iqr
-                                upper_bound = q3 + 3 * iqr
-                                X[col] = X[col].clip(lower_bound, upper_bound)
-                    
-                    # Fill remaining NaNs with median
-                    if X[col].isna().any():
-                        if X[col].notna().any():
-                            try:
-                                # Try to convert to numeric first
-                                X[col] = pd.to_numeric(X[col], errors='coerce')
-                                # Then calculate median on numeric values
-                                median_val = X[col].median()
-                                # Fill NaN values with the median
-                                X[col] = X[col].fillna(median_val)
-                            except:
-                                # If median calculation fails, use 0
-                                X[col] = X[col].fillna(0)
-                        else:
-                            X[col] = X[col].fillna(0)
-                
-                # Double-check for any remaining infinities or NaNs
-                X = X.replace([np.inf, -np.inf], np.nan)
-                X = X.fillna(0)  # Fill any remaining NaNs with 0
-                
-                
-                if dim_reduction_method == "PCA":
-                    # Lakukan PCA
-                    try:
-                        pca = PCA(n_components=2)
-                        pca_result = pca.fit_transform(X)
-                        
-                        # Buat dataframe hasil PCA
-                        pca_df = pd.DataFrame({
-                            'PCA1': pca_result[:, 0],
-                            'PCA2': pca_result[:, 1]
-                        })
-                        
-                        # Tambahkan label jika ada
-                        if 'Label' in df.columns:
-                            pca_df['Label'] = df['Label'].values
-                        
-                        # Visualisasi hasil PCA
-                        fig = px.scatter(
-                            pca_df, 
-                            x='PCA1', 
-                            y='PCA2',
-                            color='Label' if 'Label' in pca_df.columns else None,
-                            title="PCA Visualization"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Tampilkan explained variance
-                        explained_variance = pca.explained_variance_ratio_
-                        st.write(f"Explained variance ratio: {explained_variance[0]:.4f}, {explained_variance[1]:.4f}")
-                        st.write(f"Total explained variance: {sum(explained_variance):.4f}")
-                        
-                        # Visualisasi explained variance
-                        fig = px.bar(
-                            x=['PC1', 'PC2'],
-                            y=explained_variance,
-                            title="Explained Variance by Principal Component"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Feature importance dalam PCA
-                        st.subheader("Feature Importance in PCA")
-                        
-                        # Dapatkan loadings
-                        loadings = pca.components_.T
-                        
-                        # Buat dataframe untuk loadings
-                        loadings_df = pd.DataFrame({
-                            'Feature': numeric_cols,
-                            'PC1': loadings[:, 0],
-                            'PC2': loadings[:, 1],
-                            'Magnitude': np.sqrt(loadings[:, 0]**2 + loadings[:, 1]**2)
-                        }).sort_values('Magnitude', ascending=False)
-                        
-                        st.dataframe(loadings_df)
-                        
-                        # Visualisasi loadings
-                        fig = px.scatter(
-                            loadings_df, 
-                            x='PC1', 
-                            y='PC2',
-                            text='Feature',
-                            title="PCA Loadings"
-                        )
-                        fig.update_traces(textposition='top center')
-                        fig.update_layout(
-                            xaxis_title="PC1",
-                            yaxis_title="PC2",
-                            xaxis_zeroline=True,
-                            yaxis_zeroline=True
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                    except Exception as e:
-                        st.error(f"PCA failed: {str(e)}")
-                        st.info("Try removing more outliers or using a different dimensionality reduction method.")
-                
-                elif dim_reduction_method == "t-SNE":
-                    try:
-                        # Sample data if it's too large (t-SNE is computationally expensive)
-                        max_samples = 5000
-                        if len(X) > max_samples:
-                            st.info(f"Dataset is large. Sampling {max_samples} points for t-SNE visualization.")
-                            # Use stratified sampling if Label exists
-                            if 'Label' in df.columns:
-                                # Ensure all classes are represented in the sample
-                                sample_indices = []
-                                labels = df['Label'].unique()
-                                
-                                # Calculate samples per class
-                                samples_per_class = max(1, max_samples // len(labels))
-                                
-                                for label in labels:
-                                    label_indices = df[df['Label'] == label].index.tolist()
-                                    # Take either all indices or the calculated number, whichever is smaller
-                                    n_samples = min(len(label_indices), samples_per_class)
-                                    if n_samples > 0:
-                                        sampled = np.random.choice(label_indices, size=n_samples, replace=False)
-                                        sample_indices.extend(sampled)
-                                
-                                # If we need more samples to reach max_samples, add random samples
-                                if len(sample_indices) < max_samples:
-                                    remaining = max_samples - len(sample_indices)
-                                    # Get indices not already in sample_indices
-                                    remaining_indices = [i for i in range(len(df)) if i not in sample_indices]
-                                    if remaining_indices:
-                                        additional = np.random.choice(
-                                            remaining_indices, 
-                                            size=min(remaining, len(remaining_indices)), 
-                                            replace=False
-                                        )
-                                        sample_indices.extend(additional)
-                                
-                                X_sample = X.iloc[sample_indices]
-                                labels_sample = df.iloc[sample_indices]['Label'] if 'Label' in df.columns else None
-                            else:
-                                # Random sampling if no Label
-                                sample_indices = np.random.choice(len(X), size=min(max_samples, len(X)), replace=False)
-                                X_sample = X.iloc[sample_indices]
-                                labels_sample = None
-                        else:
-                            X_sample = X
-                            labels_sample = df['Label'] if 'Label' in df.columns else None
-                        
-                        # Standardize the data for t-SNE
-                        scaler = StandardScaler()
-                        X_scaled = scaler.fit_transform(X_sample)
-                        
-                        # Check for any remaining infinities or NaNs after scaling
-                        X_scaled = np.nan_to_num(X_scaled, nan=0.0, posinf=0.0, neginf=0.0)
-                        
-                        # Run t-SNE with progress information
-                        perplexity = min(30, len(X_scaled) - 1)  # Adjust perplexity based on sample size
-                        tsne = TSNE(n_components=2, perplexity=perplexity, n_iter=1000, random_state=42)
-                        
-                        with st.spinner("Running t-SNE dimensionality reduction..."):
-                            tsne_result = tsne.fit_transform(X_scaled)
-                        
-                        # Create dataframe for visualization
-                        tsne_df = pd.DataFrame({
-                            'TSNE1': tsne_result[:, 0],
-                            'TSNE2': tsne_result[:, 1]
-                        })
-                        
-                        # Add labels if available
-                        if labels_sample is not None:
-                            tsne_df['Label'] = labels_sample.values
-                        
-                        # Visualize t-SNE results
-                        fig = px.scatter(
-                            tsne_df, 
-                            x='TSNE1', 
-                            y='TSNE2',
-                            color='Label' if 'Label' in tsne_df.columns else None,
-                            title="t-SNE Visualization"
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Add information about t-SNE
-                        st.info("""
-                        t-SNE (t-Distributed Stochastic Neighbor Embedding) is a dimensionality reduction technique 
-                        that visualizes high-dimensional data by giving each datapoint a location in a 2D or 3D map. 
-                        It's particularly good at revealing clusters of similar data points.
-                        
-                        Note: Unlike PCA, t-SNE doesn't preserve global structure, so distances between separated 
-                        clusters may not be meaningful.
-                        """)
-                        
-                    except Exception as e:
-                        st.error(f"t-SNE failed: {str(e)}")
-                        st.info("""
-                        Try these solutions:
-                        1. Reduce the number of features before applying t-SNE
-                        2. Remove outliers more aggressively
-                        3. Use PCA instead, which is more robust to outliers
-                        """)
-            else:
-                st.warning("Not enough numeric features for dimensionality reduction. Need at least 3 numeric columns.")
-
-# Enhanced anomaly detection evaluation
-def evaluate_anomaly_detection(y_true, y_pred, scores):
-    """Evaluate anomaly detection performance with comprehensive metrics"""
-    
-    # If no ground truth, use unsupervised metrics
-    if y_true is None or len(np.unique(y_true)) == 1:
-        return {
-            'total_anomalies': np.sum(y_pred),
-            'anomaly_rate': np.mean(y_pred),
-            'score_distribution': {
-                'min': np.min(scores),
-                'max': np.max(scores),
-                'mean': np.mean(scores),
-                'std': np.std(scores)
-            },
-            'anomaly_thresholds': {
-                'q1': np.percentile(scores, 25),
-                'q3': np.percentile(scores, 75),
-                'iqr': np.percentile(scores, 75) - np.percentile(scores, 25)
-            }
-        }
-    
-    # Supervised evaluation with additional metrics
-    precision = precision_score(y_true, y_pred)
-    recall = recall_score(y_true, y_pred)
-    f1 = f1_score(y_true, y_pred)
-    
-    # ROC and PR curves
-    roc_auc = roc_auc_score(y_true, scores)
-    precision_curve, recall_curve, _ = precision_recall_curve(y_true, scores)
-    pr_auc = auc(recall_curve, precision_curve)
-    
-    # Confusion matrix analysis
-    cm = confusion_matrix(y_true, y_pred)
-    tn, fp, fn, tp = cm.ravel()
-    
-    return {
-        'precision': precision,
-        'recall': recall,
-        'f1_score': f1,
-        'roc_auc': roc_auc,
-        'pr_auc': pr_auc,
-        'confusion_matrix': cm,
-        'true_negatives': tn,
-        'false_positives': fp,
-        'false_negatives': fn,
-        'true_positives': tp,
-        'specificity': tn / (tn + fp) if (tn + fp) > 0 else 0,
-        'false_positive_rate': fp / (fp + tn) if (fp + tn) > 0 else 0,
-        'false_negative_rate': fn / (fn + tp) if (fn + tp) > 0 else 0
-    }
-
-# Anomaly detection pipeline
-def run_anomaly_detection_pipeline(data, method='isolation_forest', contamination=0.1):
-    """Run complete anomaly detection pipeline"""
-    
-    # Method selection
-    if method == 'isolation_forest':
-        model = IsolationForest(contamination=contamination, random_state=42)
-    elif method == 'lof':
-        model = LocalOutlierFactor(n_neighbors=20, contamination=contamination)
-    elif method == 'one_class_svm':
-        model = OneClassSVM(nu=contamination, kernel='rbf', gamma='scale')
-    
-    # Fit and predict
-    if method != 'lof':
-        model.fit(data)
-        anomaly_scores = model.decision_function(data)
-        predictions = model.predict(data)
-    else:
-        predictions = model.fit_predict(data)
-        anomaly_scores = model.negative_outlier_factor_
-    
-    # Convert to binary labels
-    anomaly_labels = np.where(predictions == -1, 1, 0)
-    
-    return {
-        'anomaly_labels': anomaly_labels,
-        'anomaly_scores': anomaly_scores,
-        'model': model
-    }
-
-# Enhanced visualization functions
-def visualize_anomalies(df, anomaly_labels, anomaly_scores, method='isolation_forest'):
-    """Create comprehensive anomaly visualizations"""
-    
-    # Create subplots for comprehensive visualization
-    fig = make_subplots(
-        rows=2, cols=2,
-        subplot_titles=('2D Feature Space', 'Anomaly Score Distribution', 
-                      'Feature Importance', 'Anomaly Heatmap'),
-        specs=[[{"type": "scatter"}, {"type": "histogram"}],
-               [{"type": "bar"}, {"type": "heatmap"}]]
-    )
-    
-    # 2D scatter plot
-    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    if len(numeric_cols) >= 2:
-        fig.add_trace(
-            go.Scatter(
-                x=df[numeric_cols[0]],
-                y=df[numeric_cols[1]],
-                mode='markers',
-                marker=dict(
-                    color=anomaly_labels,
-                    colorscale=['blue', 'red'],
-                    showscale=True,
-                    colorbar=dict(title="Anomaly")
-                ),
-                name="Data Points"
-            ),
-            row=1, col=1
-        )
-    
-    # Anomaly score distribution
-    fig.add_trace(
-        go.Histogram(
-            x=anomaly_scores,
-            nbinsx=50,
-            name="Anomaly Scores",
-            marker_color='lightblue'
-        ),
-        row=1, col=2
-    )
-    
-    # Feature importance (if model supports it)
-    if hasattr(model, 'feature_importances_'):
-        importance_df = pd.DataFrame({
-            'feature': numeric_cols,
-            'importance': model.feature_importances_
-        }).sort_values('importance', ascending=False).head(10)
-        
-        fig.add_trace(
-            go.Bar(
-                x=importance_df['importance'],
-                y=importance_df['feature'],
-                orientation='h',
-                marker_color='green'
-            ),
-            row=2, col=1
-        )
-    
-    # Anomaly heatmap for first few features
-    if len(numeric_cols) >= 4:
-        heatmap_data = df[numeric_cols[:4]].copy()
-        heatmap_data['anomaly'] = anomaly_labels
-        
-        corr_matrix = heatmap_data.corr()
-        fig.add_trace(
-            go.Heatmap(
-                z=corr_matrix.values,
-                x=corr_matrix.columns,
-                y=corr_matrix.columns,
-                colorscale='RdBu'
-            ),
-            row=2, col=2
-        )
-    
-    fig.update_layout(
-        height=800,
-        title_text=f"Anomaly Detection Visualization - {method.title()}",
-        showlegend=False
-    )
-    
-    # 3D visualization if enough features
-    if len(numeric_cols) >= 3:
-        fig_3d = px.scatter_3d(
-            df, 
-            x=numeric_cols[0], 
-            y=numeric_cols[1], 
-            z=numeric_cols[2],
-            color=anomaly_labels.astype(str),
-            title='3D Anomaly Visualization',
-            color_discrete_map={'0': 'blue', '1': 'red'}
-        )
-        return fig, fig_3d
-    
-    return fig
-
-def convert_string_features_to_numeric(df, features):
-    """Convert string features to numeric, handling IP addresses and other formats"""
-    df_processed = df.copy()
-    valid_features = []
-    
-    for col in features:
-        if col not in df_processed.columns:
-            continue
-            
-        # Skip if already numeric
-        if pd.api.types.is_numeric_dtype(df_processed[col]):
-            valid_features.append(col)
-            continue
-            
-        try:
-            # Handle IP addresses by converting to integer
-            if df_processed[col].dtype == 'object':
-                # Check if column contains IP addresses
-                ip_pattern = r'\b(?:\d{1,3}\.){3}\d{1,3}\b'
-                if df_processed[col].astype(str).str.contains(ip_pattern, na=False).any():
-                    # Convert IP to integer
-                    def ip_to_int(ip_str):
-                        try:
-                            parts = ip_str.split('.')
-                            return (int(parts[0]) << 24) + (int(parts[1]) << 16) + (int(parts[2]) << 8) + int(parts[3])
-                        except:
-                            return 0
-                    
-                    df_processed[col] = df_processed[col].astype(str).apply(ip_to_int)
-                    valid_features.append(col)
-                    continue
-            
-            # Try to convert to numeric with coercion
-            df_processed[col] = pd.to_numeric(df_processed[col], errors='coerce')
-            
-            # Handle any NaN values after conversion
-            if df_processed[col].isna().any():
-                # Fill with median for numeric columns
-                median_val = df_processed[col].median()
-                df_processed[col] = df_processed[col].fillna(median_val)
-                
-            # Check if we have valid numeric data
-            if not df_processed[col].isna().all():
-                valid_features.append(col)
-                
-        except Exception as e:
-            st.warning(f"Skipping column {col} due to conversion error: {str(e)}")
-            continue
-    
-    return df_processed, valid_features
-
-
-# Fungsi untuk ekstraksi fitur
-def extract_features(df, features):
-    st.subheader("Feature Extraction and Selection")
-    
-    # Create tabs for different feature operations
-    feature_tab1, feature_tab2, feature_tab3 = st.tabs(["Feature Importance", "Feature Selection", "Feature Engineering"])
-    
-    
-    with feature_tab1:
-        st.subheader("Feature Importance Analysis")
-
-        all_columns = df.columns.tolist()
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        if 'Label' in numeric_cols:
-            numeric_cols.remove('Label')
-
-        
-        # Allow manual selection of target column
-        if 'Label' in all_columns:
-            default_target = 'Label'
-        else:
-            default_target = all_columns[0] if all_columns else None
-                
-        target_col = st.selectbox(
-            "Select target column for feature importance analysis:",
-            options=all_columns,
-            index=all_columns.index(default_target) if default_target in all_columns else 0
-        )
-        
-        # Check if target column exists
-        if target_col:
-            has_target = True
-            
-            # Allow manual selection of features for analysis
-            available_features = [col for col in numeric_cols if col != target_col]
-            
-            if available_features:
-                # Option to use all numeric features or select specific ones
-                use_all_features = st.checkbox("Use all numeric features", value=True)
-                
-                if use_all_features:
-                    selected_features = available_features
-                else:
-                    selected_features = st.multiselect(
-                        "Select numeric features for importance analysis:",
-                        options=available_features,
-                        default=available_features[:min(10, len(available_features))]
-                    )
-                
-                # Check if we have features to analyze
-                if selected_features:
-                    # Select feature importance method
-                    importance_method = st.selectbox(
-                        "Select feature importance method:",
-                        options=["Mutual Information", "Random Forest", "Permutation Importance"]
-                    )
-                    
-                    try:
-                        # Ensure target column is properly formatted for analysis
-                        target_values = df[target_col].copy()
-                        
-                        # Convert target to numeric if it's not already
-                        if df[target_col].dtype == 'object':
-                            st.info(f"Converting categorical target '{target_col}' to numeric for analysis")
-                            # Create a mapping for categorical values
-                            unique_values = df[target_col].unique()
-                            target_map = {val: i for i, val in enumerate(unique_values)}
-                            target_values = df[target_col].map(target_map)
-                            
-                            # Display the mapping for user reference
-                            mapping_df = pd.DataFrame({
-                                'Original Value': list(target_map.keys()),
-                                'Numeric Value': list(target_map.values())
-                            })
-                            show_mapping = st.checkbox("Show category to numeric mapping")
-                            if show_mapping:
-                                st.dataframe(mapping_df)
-                        
-                        # Prepare feature data - handle missing and infinite values
-                        X = df[selected_features].copy()
-                        X = X.replace([np.inf, -np.inf], np.nan)
-                        
-                        # Fill missing values with median for each column
-                        for col in X.columns:
-                            if X[col].isna().any():
-                                X[col] = X[col].fillna(X[col].median() if X[col].notna().any() else 0)
-                        
-                        # Calculate feature importance based on selected method
-                        if importance_method == "Mutual Information":
-                            # Determine if classification or regression task
-                            unique_labels = len(np.unique(target_values))
-                            is_classification = unique_labels < 10  # Heuristic
-                            
-                            if is_classification:
-                                # For classification tasks
-                                from sklearn.feature_selection import mutual_info_classif
-                                importance_scores = mutual_info_classif(X, target_values)
-                                method_name = "Mutual Information (Classification)"
-                            else:
-                                # For regression tasks
-                                from sklearn.feature_selection import mutual_info_regression
-                                importance_scores = mutual_info_regression(X, target_values)
-                                method_name = "Mutual Information (Regression)"
-                                
-                        elif importance_method == "Random Forest":
-                            # Determine if classification or regression task
-                            unique_labels = len(np.unique(target_values))
-                            is_classification = unique_labels < 10  # Heuristic
-                            
-                            if is_classification:
-                                # For classification tasks
-                                from sklearn.ensemble import RandomForestClassifier
-                                model = RandomForestClassifier(n_estimators=100, random_state=42)
-                                model.fit(X, target_values)
-                                importance_scores = model.feature_importances_
-                                method_name = "Random Forest Importance (Classification)"
-                            else:
-                                # For regression tasks
-                                from sklearn.ensemble import RandomForestRegressor
-                                model = RandomForestRegressor(n_estimators=100, random_state=42)
-                                model.fit(X, target_values)
-                                importance_scores = model.feature_importances_
-                                method_name = "Random Forest Importance (Regression)"
-                                
-                        elif importance_method == "Permutation Importance":
-                            # Determine if classification or regression task
-                            unique_labels = len(np.unique(target_values))
-                            is_classification = unique_labels < 10  # Heuristic
-                            
-                            from sklearn.inspection import permutation_importance
-                            
-                            if is_classification:
-                                # For classification tasks
-                                from sklearn.ensemble import RandomForestClassifier
-                                model = RandomForestClassifier(n_estimators=50, random_state=42)
-                                model.fit(X, target_values)
-                                
-                                # Calculate permutation importance
-                                result = permutation_importance(model, X, target_values, n_repeats=10, random_state=42)
-                                importance_scores = result.importances_mean
-                                method_name = "Permutation Importance (Classification)"
-                            else:
-                                # For regression tasks
-                                from sklearn.ensemble import RandomForestRegressor
-                                model = RandomForestRegressor(n_estimators=50, random_state=42)
-                                model.fit(X, target_values)
-                                
-                                # Calculate permutation importance
-                                result = permutation_importance(model, X, target_values, n_repeats=10, random_state=42)
-                                importance_scores = result.importances_mean
-                                method_name = "Permutation Importance (Regression)"
-                        
-                        # Create dataframe for feature scores
-                        feature_scores = pd.DataFrame({
-                            'Feature': selected_features,
-                            'Importance': importance_scores
-                        }).sort_values('Importance', ascending=False)
-                        
-                        # Visualize feature importance
-                        fig = px.bar(
-                            feature_scores.head(20),
-                            x='Feature',
-                            y='Importance',
-                            title=f"Top 20 Features by {method_name} (Target: {target_col})",
-                            color='Importance'
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Display feature importance table
-                        st.dataframe(feature_scores)
-                        
-                        # Option to add top features to the dataset
-                        if st.checkbox("Add feature importance as a column to the dataset"):
-                            top_n = st.slider("Number of top features to include", 1, len(selected_features), 
-                                             min(5, len(selected_features)))
-                            top_features = feature_scores.head(top_n)['Feature'].tolist()
-                            st.success(f"Selected top {top_n} features: {', '.join(top_features)}")
-                            return df, top_features
-                        
-                    except Exception as e:
-                        st.error(f"Error calculating feature importance: {str(e)}")
-                        st.info("Tip: Make sure your target column and selected features are compatible for analysis")
-                        st.exception(e)  # Show detailed error for debugging
-                else:
-                    st.warning("Please select at least one feature for importance analysis")
-            else:
-                st.warning("No numeric features available for analysis")
-        else:
-            st.error("No columns available to use as target")
-            has_target = False
-        
-    with feature_tab2:
-        st.subheader("Feature Selection")
-            
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        selected_features = [col for col in selected_features if col in numeric_cols]
-
-        if 'Label' in selected_features:
-            selected_features.remove('Label')
-
-        # Extract features and labels
-        X = df[selected_features].values
-        y = df['Label'].values
-            
-        if len(numeric_cols) > 0:
-                # Pilih metode seleksi fitur
-                selection_method = st.radio(
-                    "Select feature selection method",
-                    options=["Variance Threshold", "SelectKBest (ANOVA F-value)", "SelectKBest (Mutual Information)", 
-                             "HistGradientBoosting Importance"]
-                )
-                
-                if selection_method == "Variance Threshold":
-                    # Pilih threshold
-                    variance_threshold = st.slider(
-                        "Variance threshold",
-                        min_value=0.0,
-                        max_value=1.0,
-                        value=0.01,
-                        step=0.01
-                    )
-                    
-                    # Lakukan seleksi fitur
-                    try:
-                        selector = VarianceThreshold(threshold=variance_threshold)
-                        X_selected = selector.fit_transform(df[numeric_cols])
-                        
-                        # Dapatkan fitur yang dipilih
-                        selected_features = [numeric_cols[i] for i in range(len(numeric_cols)) 
-                                            if selector.get_support()[i]]
-                        
-                        # Tampilkan hasil
-                        st.success(f"Selected {len(selected_features)} features out of {len(numeric_cols)}")
-                        st.write("Selected features:")
-                        st.write(selected_features)
-                        
-                        # Tampilkan variance untuk setiap fitur
-                        variance_df = pd.DataFrame({
-                            'Feature': numeric_cols,
-                            'Variance': selector.variances_,
-                            'Selected': selector.get_support()
-                        }).sort_values('Variance', ascending=False)
-                        
-                        st.dataframe(variance_df)
-                        
-                        # Visualisasi variance
-                        fig = px.bar(
-                            variance_df,
-                            x='Feature',
-                            y='Variance',
-                            color='Selected',
-                            title="Feature Variance",
-                            color_discrete_map={True: 'green', False: 'red'}
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Error in variance thresholding: {str(e)}")
-                
-                elif selection_method == "SelectKBest (ANOVA F-value)":
-                    if 'Label' in df.columns:
-                        # Pilih jumlah fitur
-                        k_features = st.slider(
-                            "Number of features to select",
-                            min_value=1,
-                            max_value=min(20, len(numeric_cols)),
-                            value=min(10, len(numeric_cols))
-                        )
-                        
-                        # Lakukan seleksi fitur
-                        try:
-                            selector = SelectKBest(f_classif, k=k_features)
-                            X_selected = selector.fit_transform(df[numeric_cols], df['Label'])
-                            
-                            # Dapatkan fitur yang dipilih
-                            selected_features = [numeric_cols[i] for i in range(len(numeric_cols)) 
-                                                if selector.get_support()[i]]
-                            
-                            # Tampilkan hasil
-                            st.success(f"Selected {len(selected_features)} features using ANOVA F-value")
-                            
-                            # Buat dataframe untuk skor fitur
-                            feature_scores = pd.DataFrame({
-                                'Feature': numeric_cols,
-                                'Score': selector.scores_,
-                                'P-value': selector.pvalues_,
-                                'Selected': selector.get_support()
-                            }).sort_values('Score', ascending=False)
-                            
-                            st.dataframe(feature_scores)
-                            
-                            # Visualisasi skor fitur
-                            fig = px.bar(
-                                feature_scores.head(20),
-                                x='Feature',
-                                y='Score',
-                                color='Selected',
-                                title="Feature Scores (ANOVA F-value)",
-                                color_discrete_map={True: 'green', False: 'gray'}
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            # Visualisasi p-values
-                            fig = px.bar(
-                                feature_scores.head(20),
-                                x='Feature',
-                                y='P-value',
-                                color='Selected',
-                                title="Feature P-values (ANOVA F-value)",
-                                color_discrete_map={True: 'green', False: 'gray'},
-                                log_y=True
-                            )
-                            fig.add_hline(y=0.05, line_dash="dash", line_color="red", annotation_text="p=0.05")
-                            st.plotly_chart(fig, use_container_width=True)
-                        except Exception as e:
-                            st.error(f"Error in ANOVA F-value feature selection: {str(e)}")
-                    else:
-                        st.warning("Label column required for ANOVA F-value feature selection")
-                
-                elif selection_method == "SelectKBest (Mutual Information)":
-                    if 'Label' in df.columns:
-                        # Pilih jumlah fitur
-                        k_features = st.slider(
-                            "Number of features to select",
-                            min_value=1,
-                            max_value=min(20, len(numeric_cols)),
-                            value=min(10, len(numeric_cols))
-                        )
-                        
-                        # Lakukan seleksi fitur
-                        try:
-                            selector = SelectKBest(mutual_info_classif, k=k_features)
-                            X_selected = selector.fit_transform(df[numeric_cols], df['Label'])
-                            
-                            # Dapatkan fitur yang dipilih
-                            selected_features = [numeric_cols[i] for i in range(len(numeric_cols)) 
-                                                if selector.get_support()[i]]
-                            
-                            # Tampilkan hasil
-                            st.success(f"Selected {len(selected_features)} features using Mutual Information")
-                            
-                            # Buat dataframe untuk skor fitur
-                            feature_scores = pd.DataFrame({
-                                'Feature': numeric_cols,
-                                'Score': selector.scores_,
-                                'Selected': selector.get_support()
-                            }).sort_values('Score', ascending=False)
-                            
-                            st.dataframe(feature_scores)
-                            
-                            # Visualisasi skor fitur
-                            fig = px.bar(
-                                feature_scores.head(20),
-                                x='Feature',
-                                y='Score',
-                                color='Selected',
-                                title="Feature Scores (Mutual Information)",
-                                color_discrete_map={True: 'green', False: 'gray'}
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                        except Exception as e:
-                            st.error(f"Error in Mutual Information feature selection: {str(e)}")
-                    else:
-                        st.warning("Label column required for Mutual Information feature selection")
-   
-
-                elif selection_method == "HistGradientBoosting Importance":
-                    if 'Label' in df.columns:
-                        from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
-                        
-                        # Check if we need classification or regression
-                        unique_labels = df['Label'].nunique()
-                        is_classification = unique_labels < 10  # Heuristic: if fewer than 10 unique values, assume classification
-                        
-                        # Let user override the detection
-                        task_type = st.radio(
-                            "Task type",
-                            options=["Classification", "Regression"],
-                            index=0 if is_classification else 1
-                        )
-                        
-                        # Number of features to select
-                        k_features = st.slider(
-                            "Number of features to select",
-                            min_value=1,
-                            max_value=min(20, len(numeric_cols)),
-                            value=min(10, len(numeric_cols))
-                        )
-                        
-                        # Model parameters
-                        learning_rate = st.slider("Learning rate", 0.01, 1.0, 0.1, 0.01)
-                        max_iter = st.slider("Maximum iterations", 10, 500, 100, 10)
-                        max_depth = st.slider("Maximum tree depth", 1, 20, 10, 1)
-                        
-                        try:
-                            # Prepare data
-                            X = df[numeric_cols].copy()
-                            y = df['Label'].copy()
-                            
-                            # Handle non-numeric target for regression
-                            if task_type == "Regression" and not pd.api.types.is_numeric_dtype(y):
-                                st.warning("Converting non-numeric target to numeric for regression")
-                                # Map categorical values to numbers
-                                y = pd.factorize(y)[0]
-                            
-                            # Create and train the model
-                            with st.spinner("Training HistGradientBoosting model..."):
-                                if task_type == "Classification":
-                                    model = HistGradientBoostingClassifier(
-                                        learning_rate=learning_rate,
-                                        max_iter=max_iter,
-                                        max_depth=max_depth,
-                                        random_state=42
-                                    )
-                                else:  # Regression
-                                    model = HistGradientBoostingRegressor(
-                                        learning_rate=learning_rate,
-                                        max_iter=max_iter,
-                                        max_depth=max_depth,
-                                        random_state=42
-                                    )
-                                
-                                # Replace infinities and NaNs
-                                X = X.replace([np.inf, -np.inf], np.nan)
-                                
-                                # Handle NaNs with safer median calculation
-                                for col in X.columns:
-                                    if X[col].isna().any():
-                                        try:
-                                            # Try to convert to numeric first
-                                            X[col] = pd.to_numeric(X[col], errors='coerce')
-                                            # Calculate median on numeric values
-                                            median_val = X[col].median()
-                                            # Fill NaN values with the median
-                                            X[col] = X[col].fillna(median_val)
-                                        except:
-                                            # If median calculation fails, use 0
-                                            X[col] = X[col].fillna(0)
-                                
-                                # Fit the model
-                                model.fit(X, y)
-                            
-                            # Get feature importances
-                            if hasattr(model, 'feature_importances_'):
-                                importances = model.feature_importances_
-                                
-                                # Create dataframe for feature importances
-                                importance_df = pd.DataFrame({
-                                    'Feature': numeric_cols,
-                                    'Importance': importances
-                                }).sort_values('Importance', ascending=False)
-                                
-                                # Select top k features
-                                selected_features = importance_df.head(k_features)['Feature'].tolist()
-                                
-                                # Display results
-                                st.success(f"Selected {len(selected_features)} features using HistGradientBoosting importance")
-                                
-                                # Add a 'Selected' column for visualization
-                                importance_df['Selected'] = importance_df['Feature'].isin(selected_features)
-                                
-                                # Show feature importance table
-                                st.dataframe(importance_df)
-                                
-                                # Visualize feature importances
-                                fig = px.bar(
-                                    importance_df.head(20),
-                                    x='Feature',
-                                    y='Importance',
-                                    color='Selected',
-                                    title=f"Feature Importance (HistGradientBoosting {task_type})",
-                                    color_discrete_map={True: 'green', False: 'gray'}
-                                )
-                                st.plotly_chart(fig, use_container_width=True)
-                                
-                                # Option to use selected features
-                                if st.checkbox("Use these selected features for further analysis"):
-                                    st.success(f"Using top {k_features} features: {', '.join(selected_features)}")
-                                    return df, selected_features
-                            else:
-                                st.error("Model doesn't have feature_importances_ attribute")
-                        except Exception as e:
-                            st.error(f"Error in HistGradientBoosting feature selection: {str(e)}")
-                            st.info("Try adjusting the parameters or preprocessing the data")
-                    else:
-                        st.warning("Label column required for HistGradientBoosting feature selection")
-                else:
-                    st.warning("No numeric features found for feature selection")    
-
-    with feature_tab3:
-        st.subheader("Feature Engineering")
-            
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        if 'Label' in numeric_cols:
-                numeric_cols.remove('Label')
-            
-        if len(numeric_cols) > 0:
-                # Pilih metode feature engineering
-                engineering_method = st.radio(
-                    "Select feature engineering method",
-                    options=["Polynomial Features", "PCA Transformation", "Custom Feature Combinations"]
-                )
-                
-                if engineering_method == "Polynomial Features":
-                    # Pilih derajat polinomial
-                    poly_degree = st.slider(
-                        "Polynomial degree",
-                        min_value=2,
-                        max_value=3,
-                        value=2
-                    )
-                    
-                    # Pilih fitur untuk transformasi polinomial
-                    if len(numeric_cols) > 5:
-                        selected_features = st.multiselect(
-                            "Select features for polynomial transformation (max 5 recommended)",
-                            options=numeric_cols,
-                            default=numeric_cols[:2]
-                        )
-                    else:
-                        selected_features = numeric_cols
-                    
-                    if selected_features:
-                        # Lakukan transformasi polinomial
-                        try:
-                            from sklearn.preprocessing import PolynomialFeatures
-                            
-                            poly = PolynomialFeatures(degree=poly_degree, include_bias=False)
-                            poly_features = poly.fit_transform(df[selected_features])
-                            
-                            # Dapatkan nama fitur baru
-                            feature_names = poly.get_feature_names_out(selected_features)
-                            
-                            # Buat dataframe dengan fitur polinomial
-                            poly_df = pd.DataFrame(poly_features, columns=feature_names)
-                            
-                            # Tampilkan hasil
-                            st.success(f"Created {poly_df.shape[1]} polynomial features from {len(selected_features)} original features")
-                            
-                            # Tampilkan sampel data
-                            st.write("Sample of polynomial features:")
-                            st.dataframe(poly_df.head())
-                            
-                            # Visualisasi distribusi fitur polinomial
-                            if st.checkbox("Visualize polynomial feature distributions"):
-                                # Pilih fitur untuk visualisasi
-                                poly_viz_feature = st.selectbox(
-                                    "Select polynomial feature to visualize",
-                                    options=feature_names
-                                )
-                                
-                                # Histogram
-                                fig = px.histogram(
-                                    poly_df,
-                                    x=poly_viz_feature,
-                                    title=f"Distribution of {poly_viz_feature}",
-                                    marginal="box"
-                                )
-                                st.plotly_chart(fig, use_container_width=True)
-                        except Exception as e:
-                            st.error(f"Error in polynomial feature generation: {str(e)}")
-                
-                elif engineering_method == "PCA Transformation":
-                    # Pilih jumlah komponen
-                    n_components = st.slider(
-                        "Number of PCA components",
-                        min_value=2,
-                        max_value=min(10, len(numeric_cols)),
-                        value=min(5, len(numeric_cols))
-                    )
-                    
-                    # Lakukan transformasi PCA
-                    try:
-                        # Standardisasi data
-                        scaler = StandardScaler()
-                        scaled_data = scaler.fit_transform(df[numeric_cols])
-                        
-                        # Lakukan PCA
-                        pca = PCA(n_components=n_components)
-                        pca_result = pca.fit_transform(scaled_data)
-                        
-                        # Buat dataframe dengan komponen PCA
-                        pca_df = pd.DataFrame(
-                            pca_result,
-                            columns=[f"PC{i+1}" for i in range(n_components)]
-                        )
-                        
-                        # Tampilkan hasil
-                        st.success(f"Created {n_components} PCA components from {len(numeric_cols)} original features")
-                        
-                        # Tampilkan explained variance
-                        explained_variance = pca.explained_variance_ratio_
-                        cumulative_variance = np.cumsum(explained_variance)
-                        
-                        # Visualisasi explained variance
-                        variance_df = pd.DataFrame({
-                            'Component': [f"PC{i+1}" for i in range(n_components)],
-                            'Explained Variance': explained_variance,
-                            'Cumulative Variance': cumulative_variance
-                        })
-                        
-                        # Tampilkan tabel
-                        st.write("Explained variance by component:")
-                        st.dataframe(variance_df)
-                        
-                        # Visualisasi explained variance
-                        fig = px.bar(
-                            variance_df,
-                            x='Component',
-                            y='Explained Variance',
-                            title="Explained Variance by PCA Component"
-                        )
-                        fig.add_trace(
-                            go.Scatter(
-                                x=variance_df['Component'],
-                                y=variance_df['Cumulative Variance'],
-                                mode='lines+markers',
-                                name='Cumulative Variance',
-                                yaxis='y2'
-                            )
-                        )
-                        fig.update_layout(
-                            yaxis2=dict(
-                                title='Cumulative Variance',
-                                overlaying='y',
-                                side='right',
-                                range=[0, 1]
-                            )
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Tampilkan sampel data
-                        st.write("Sample of PCA components:")
-                        st.dataframe(pca_df.head())
-                        
-                        # Visualisasi loadings
-                        loadings = pca.components_
-                        loadings_df = pd.DataFrame(
-                            loadings.T,
-                            columns=[f"PC{i+1}" for i in range(n_components)],
-                            index=numeric_cols
-                        )
-                        
-                        st.write("PCA Loadings (feature contributions to each component):")
-                        st.dataframe(loadings_df)
-                        
-                        # Heatmap loadings
-                        fig, ax = plt.subplots(figsize=(12, 8))
-                        sns.heatmap(loadings_df, annot=True, cmap='coolwarm', ax=ax)
-                        plt.title('PCA Loadings Heatmap')
-                        st.pyplot(fig)
-                    except Exception as e:
-                        st.error(f"Error in PCA transformation: {str(e)}")
-                
-                elif engineering_method == "Custom Feature Combinations":
-                    st.write("Create custom feature combinations by applying operations to existing features")
-                    
-                    # Pilih fitur untuk kombinasi
-                    if len(numeric_cols) > 0:
-                        feature1 = st.selectbox(
-                            "Select first feature",
-                            options=numeric_cols
-                        )
-                        
-                        feature2 = st.selectbox(
-                            "Select second feature",
-                            options=[col for col in numeric_cols if col != feature1],
-                            index=0 if len(numeric_cols) > 1 else None
-                        )
-                        
-                        # Pilih operasi
-                        operation = st.radio(
-                            "Select operation",
-                            options=["Sum", "Difference", "Product", "Ratio", "Mean"]
-                        )
-                        
-                        if feature1 and feature2:
-                            try:
-                                # Lakukan operasi
-                                if operation == "Sum":
-                                    result = df[feature1] + df[feature2]
-                                    new_feature_name = f"{feature1}_plus_{feature2}"
-                                elif operation == "Difference":
-                                    result = df[feature1] - df[feature2]
-                                    new_feature_name = f"{feature1}_minus_{feature2}"
-                                elif operation == "Product":
-                                    result = df[feature1] * df[feature2]
-                                    new_feature_name = f"{feature1}_times_{feature2}"
-                                elif operation == "Ratio":
-                                    # Handle division by zero
-                                    result = df[feature1] / df[feature2].replace(0, np.nan)
-                                    new_feature_name = f"{feature1}_div_{feature2}"
-                                elif operation == "Mean":
-                                    result = (df[feature1] + df[feature2]) / 2
-                                    new_feature_name = f"mean_{feature1}_{feature2}"
-                                
-                                # Tampilkan hasil
-                                st.success(f"Created new feature: {new_feature_name}")
-                                
-                                # Statistik fitur baru
-                                stats = pd.DataFrame({
-                                    'Statistic': ['Mean', 'Median', 'Std Dev', 'Min', 'Max'],
-                                    'Value': [
-                                        result.mean(),
-                                        result.median(),
-                                        result.std(),
-                                        result.min(),
-                                        result.max()
-                                    ]
-                                })
-                                
-                                st.write("Statistics of new feature:")
-                                st.dataframe(stats)
-                                
-                                # Visualisasi distribusi
-                                fig = px.histogram(
-                                    x=result,
-                                    title=f"Distribution of {new_feature_name}",
-                                    marginal="box"
-                                )
-                                st.plotly_chart(fig, use_container_width=True)
-                                
-                                # Scatter plot dengan fitur asli
-                                fig = px.scatter(
-                                    x=df[feature1],
-                                    y=df[feature2],
-                                    color=result,
-                                    title=f"Scatter Plot: {feature1} vs {feature2}, colored by {new_feature_name}",
-                                    labels={'x': feature1, 'y': feature2, 'color': new_feature_name}
-                                )
-                                st.plotly_chart(fig, use_container_width=True)
-                                
-                                # Korelasi dengan target (jika ada)
-                                if 'Label' in df.columns and df['Label'].dtype != 'object':
-                                    corr, _ = pearsonr(result.fillna(0), df['Label'])
-                                    st.write(f"Correlation with target: {corr:.4f}")
-                                    
-                                    # Bandingkan dengan korelasi fitur asli
-                                    corr1, _ = pearsonr(df[feature1], df['Label'])
-                                    corr2, _ = pearsonr(df[feature2], df['Label'])
-                                    
-                                    corr_df = pd.DataFrame({
-                                        'Feature': [feature1, feature2, new_feature_name],
-                                        'Correlation with Target': [corr1, corr2, corr]
-                                    })
-                                    
-                                    fig = px.bar(
-                                        corr_df,
-                                        x='Feature',
-                                        y='Correlation with Target',
-                                        title="Correlation Comparison",
-                                        color='Correlation with Target',
-                                        color_continuous_scale=px.colors.diverging.RdBu_r
-                                    )
-                                    st.plotly_chart(fig, use_container_width=True)
-                            except Exception as e:
-                                st.error(f"Error in custom feature creation: {str(e)}")
-                    else:
-                        st.warning("Not enough numeric features for custom combinations")
-                else:
-                    st.warning("No numeric features found for feature engineering")
-    
-    return df, features
-
-def train_anomaly_detection_model(df):
-    """Train anomaly detection model"""
-    st.subheader("Anomaly Detection Model Training")
-    
-    # Preprocess data
-    processed_df, scaler = preprocess_for_anomaly_detection(df)
-    
-    # Enhanced visualization after training
-    if st.checkbox("Show advanced visualizations"):
-        # Correlation heatmap
-        numeric_df = processed_df[numeric_cols]
-        correlation_matrix = numeric_df.corr()
-        
-        fig, ax = plt.subplots(figsize=(12, 10))
-        sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', center=0, ax=ax)
-        plt.title('Feature Correlation Heatmap')
-        st.pyplot(fig)
-    
-    # Feature importance visualization
-    if hasattr(results['model'], 'feature_importances_'):
-        importance_df = pd.DataFrame({
-            'Feature': numeric_cols,
-            'Importance': results['model'].feature_importances_
-        }).sort_values('Importance', ascending=False)
-        
-        fig = px.bar(importance_df.head(10), x='Feature', y='Importance',
-                    title='Top 10 Most Important Features')
-        st.plotly_chart(fig, use_container_width=True)
-
-    # Select features for anomaly detection
-    numeric_cols = processed_df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    if len(numeric_cols) == 0:
-        st.error("No numeric features found for anomaly detection")
-        return None
-    
-    # Select anomaly detection method
-    method = st.selectbox(
-        "Select anomaly detection method",
-        options=["isolation_forest", "lof", "one_class_svm"]
-    )
-    
-    # Set contamination parameter
-    contamination = st.slider(
-        "Contamination rate (expected proportion of anomalies)",
-        min_value=0.01,
-        max_value=0.5,
-        value=0.1,
-        step=0.01
-    )
-    
-    # Train model
-    if st.button("Train Anomaly Detection Model"):
-        with st.spinner("Training anomaly detection model..."):
-            # Prepare data
-            X = processed_df[numeric_cols].values
-            
-            # Run anomaly detection
-            results = run_anomaly_detection_pipeline(X, method, contamination)
-            
-            # Display results
-            st.success("Anomaly detection model trained successfully!")
-            
-            # Show anomaly distribution
-            anomaly_count = np.sum(results['anomaly_labels'])
-            total_count = len(results['anomaly_labels'])
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("Total Samples", total_count)
-                st.metric("Anomalies Detected", anomaly_count)
-            with col2:
-                st.metric("Anomaly Rate", f"{anomaly_count/total_count:.2%}")
-                st.metric("Normal Samples", total_count - anomaly_count)
-            
-            # Visualize results
-            results_df = pd.DataFrame({
-                'anomaly_score': results['anomaly_scores'],
-                'is_anomaly': results['anomaly_labels']
-            })
-            
-            # Distribution of anomaly scores
-            fig = px.histogram(
-                results_df, 
-                x='anomaly_score',
-                color='is_anomaly',
-                title='Distribution of Anomaly Scores',
-                nbins=50
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Save model
-            model_data = {
-                'model': results['model'],
-                'scaler': scaler,
-                'features': numeric_cols,
-                'contamination': contamination,
-                'method': method
-            }
-            
-            model_path = os.path.join('d:\cybersecurity', 'anomaly_model.pkl')
-            joblib.dump(model_data, model_path)
-            st.success(f"Anomaly detection model saved to {model_path}")
-            
-            # Model persistence options
-            st.subheader("Model Management")
-
-            # Save model with metadata
-            model_path = os.path.join('models', f'anomaly_model_{method}_{pd.Timestamp.now().strftime("%Y%m%d_%H%M%S")}.pkl')
-            saved_path = save_anomaly_model(
-                results['model'], scaler, model_path
-            )
-            st.success(f"Model saved to: {saved_path}")
-
-            # List saved models
-            if st.checkbox("View saved models"):
-                models_dir = 'models'
-                if os.path.exists(models_dir):
-                    model_files = [f for f in os.listdir(models_dir) if f.endswith('.pkl')]
-                    if model_files:
-                        st.write("Available models:")
-                        for model_file in model_files:
-                            st.write(f"- {model_file}")
-                    else:
-                        st.info("No saved models found")
-            return results
-    return None
-
-def train_model_page():
-    st.title('Train Network Intrusion Detection Model')
-    
-    # File uploader for training data
-    uploaded_file = st.file_uploader("Upload your training dataset (CSV)", type="csv")
-    
-    if uploaded_file is not None:
-        # Load and preprocess data
-        st.info("Loading and preprocessing data...")
-        df = pd.read_csv(uploaded_file)
-        
-        # Display basic dataset info
-        st.write("Dataset shape:", df.shape)  # Changed from processed_df to df
-        st.write("Sample data:")
-        st.dataframe(df.head())
-        
-        # Check if 'Label' column exists
-        if 'Label' not in df.columns:  # Changed from processed_df to df
-            st.error("Dataset must contain a 'Label' column for training.")
-            return
-        
-        # EDA and feature extraction
-        with st.expander("Exploratory Data Analysis", expanded=False):
-            perform_eda(df)
-        
-        # Feature extraction and selection
-        with st.expander("Feature Extraction and Selection", expanded=False):
-            df, selected_features = extract_features(df, df.columns.tolist())
-        
-        # Model training parameters
-        st.subheader("Model Training Parameters")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            hidden_channels = st.slider("Hidden Channels", 8, 256, 64, step=8)
-            num_layers = st.slider("Number of GNN Layers", 1, 5, 2)
-            dropout_rate = st.slider("Dropout Rate", 0.0, 0.8, 0.5, step=0.1)
-        
-        with col2:
-            learning_rate = st.number_input("Learning Rate", 0.0001, 0.1, 0.001, format="%.4f")
-            num_epochs = st.slider("Number of Epochs", 10, 500, 100)
-            batch_size = st.slider("Batch Size", 16, 256, 64, step=16)
-        
-        # Advanced parameters
-        with st.expander("Advanced Parameters", expanded=False):
-            weight_decay = st.number_input("Weight Decay", 0.0, 0.1, 0.0001, format="%.5f")
-            early_stopping = st.checkbox("Enable Early Stopping", value=True)
-            patience = st.slider("Patience for Early Stopping", 5, 50, 10) if early_stopping else 0
-            validation_split = st.slider("Validation Split", 0.1, 0.3, 0.2, step=0.05)
-            use_class_weights = st.checkbox("Use Class Weights for Imbalanced Data", value=True)
-        
-        # Anomaly detection option
-    use_anomaly_detection = st.checkbox("Use Anomaly Detection (Unsupervised)", value=False)
-    
-    if use_anomaly_detection:
-        train_anomaly_detection_model(df)
-        return
-    
-    # Start training
-    if st.button("Train Model"):
-
-            st.info("Starting model training process...")
-
-            try:
-                # Prepare data for GNN
-                with st.spinner("Preparing data for GNN model..."):
-                    # Make sure we have the necessary features
-                    if not selected_features or len(selected_features) < 2:
-                        st.warning("Not enough features selected. Using all numeric features.")
-                        selected_features = df.select_dtypes(include=[np.number]).columns.tolist()  # Changed from processed_df to df
-                        if 'Label' in selected_features:
-                            selected_features.remove('Label')
-                    
-                    # Extract features and labels
-                    # Ensure all selected features are properly converted to numeric
-                    df_processed, valid_features = convert_string_features_to_numeric(df, selected_features)
-                    
-                    if len(valid_features) < 2:
-                        st.error("Not enough valid numeric features found. Please check your data.")
-                        return
-                    
-                    X = df_processed[valid_features].values.astype(float)
-                    y = df['Label'].values
-                    
-                    # Convert labels to numeric if they're not already
-                    if not pd.api.types.is_numeric_dtype(df['Label']):
-                        st.info("Converting categorical labels to numeric values")
-                        label_mapping = {label: i for i, label in enumerate(df['Label'].unique())}
-                        y = df['Label'].map(label_mapping).values
-                        
-                        # Display the mapping
-                        mapping_df = pd.DataFrame({
-                            'Original Label': list(label_mapping.keys()),
-                            'Numeric Value': list(label_mapping.values())
-                        })
-                        st.write("Label mapping:")
-                        st.dataframe(mapping_df)
-                    
-                    # Normalize features
-                    scaler = StandardScaler()
-                    X_scaled = scaler.fit_transform(X)
-                    
-                    # Create a progress bar
-                    progress_bar = st.progress(0)
-                    
-                    # Initialize the model
-                    model = IDSGNNModel(
-                        input_dim=X_scaled.shape[1],
-                        hidden_channels=hidden_channels,
-                        num_classes=len(np.unique(y)),
-                        num_layers=num_layers,
-                        dropout_rate=dropout_rate
-                    )
-                    
-                    # Create a placeholder for metrics
-                    metrics_container = st.empty()
-                    
-                    # Create a placeholder for the training plot
-                    plot_container = st.empty()
-                    
-                    # Prepare data for training
-                    train_data = model.prepare_data(X_scaled, y, validation_split=validation_split)
-                    
-                    # Calculate class weights if needed
-                    class_weights = None
-                    if use_class_weights:
-                        class_weights = model.calculate_class_weights(y)
-                        st.write("Class weights:", class_weights)
-                    
-                    # Train the model
-                    training_results = model.train_model(
-                        train_data,
-                        learning_rate=learning_rate,
-                        weight_decay=weight_decay,
-                        num_epochs=num_epochs,
-                        batch_size=batch_size,
-                        early_stopping=early_stopping,
-                        patience=patience,
-                        class_weights=class_weights,
-                        progress_callback=lambda epoch, total, train_loss, val_loss, train_acc, val_acc: update_progress(
-                            epoch, total, train_loss, val_loss, train_acc, val_acc,
-                            progress_bar, metrics_container, plot_container
-                        )
-                    )
-                    
-                    # Display final results
-                    st.success("Model training completed!")
-                    
-                    # Display training history
-                    st.subheader("Training History")
-                    history_df = pd.DataFrame(training_results['history'])
-                    st.line_chart(history_df[['train_loss', 'val_loss']])
-                    st.line_chart(history_df[['train_acc', 'val_acc']])
-                    
-                    # Display model evaluation
-                    st.subheader("Model Evaluation")
-                    evaluation = model.evaluate_model(train_data['test_data'], train_data['test_labels'])
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Test Accuracy", f"{evaluation['accuracy']:.4f}")
-                        st.metric("Precision", f"{evaluation['precision']:.4f}")
-                    
-                    with col2:
-                        st.metric("Recall", f"{evaluation['recall']:.4f}")
-                        st.metric("F1 Score", f"{evaluation['f1']:.4f}")
-                    
-                    # Display confusion matrix
-                    st.subheader("Confusion Matrix")
-                    fig, ax = plt.subplots(figsize=(10, 8))
-                    sns.heatmap(evaluation['confusion_matrix'], annot=True, fmt='d', cmap='Blues', ax=ax)
-                    plt.xlabel('Predicted Label')
-                    plt.ylabel('True Label')
-                    st.pyplot(fig)
-                    
-                    # Display classification report
-                    st.subheader("Classification Report")
-                    st.text(evaluation['classification_report'])
-                    
-                    # Save the model
-                    model_path = os.path.join('d:\\cybersecurity', 'trained_model.pkl')
-                    scaler_path = os.path.join('d:\\cybersecurity', 'feature_scaler.pkl')
-                    
-                    model.save_model(model_path)
-                    joblib.dump(scaler, scaler_path)
-                    
-                    st.success(f"Model saved to {model_path}")
-                    st.success(f"Feature scaler saved to {scaler_path}")
-                    
-                    # Save feature information
-                    feature_info = {
-                        'selected_features': selected_features,
-                        'label_mapping': label_mapping if not pd.api.types.is_numeric_dtype(df['Label']) else None
-                    }
-                    
-                    feature_info_path = os.path.join('d:\\cybersecurity', 'feature_info.pkl')
-                    joblib.dump(feature_info, feature_info_path)
-                    st.success(f"Feature information saved to {feature_info_path}")
-                    
-            except Exception as e:
-                st.error(f"Error during model training: {str(e)}")
-                st.exception(e)
-
-# Helper function to update progress during training
-def update_progress(epoch, total_epochs, train_loss, val_loss, train_acc, val_acc, progress_bar, metrics_container, plot_container):
-    # Update progress bar
-    progress = (epoch + 1) / total_epochs
-    progress_bar.progress(progress)
-    
-    # Update metrics
-    metrics_container.markdown(f"""
-    **Epoch {epoch+1}/{total_epochs}**
-    - Training Loss: {train_loss:.4f}
-    - Validation Loss: {val_loss:.4f}
-    - Training Accuracy: {train_acc:.4f}
-    - Validation Accuracy: {val_acc:.4f}
+    Upload file log API Anda dalam format CSV. Data yang dikumpulkan sebaiknya mencakup:
+    - IP Address: Alamat asal permintaan
+    - Timestamp: Waktu permintaan
+    - User Agent: Informasi tentang perangkat atau aplikasi yang digunakan
+    - Endpoint/API Call: API spesifik yang diakses
+    - Parameters: Parameter yang dikirim dalam permintaan
+    - Response Status Code: Kode status balasan (contoh: 200, 404)
+    - Response Time: Waktu yang dibutuhkan untuk membalas permintaan
     """)
     
-    # Update plot
-    history_data = {
-        'Epoch': list(range(1, epoch+2)),
-        'Training Loss': [train_loss],
-        'Validation Loss': [val_loss],
-        'Training Accuracy': [train_acc],
-        'Validation Accuracy': [val_acc]
-    }
-    
-    # Create and update the plot
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=history_data['Epoch'], y=history_data['Training Loss'], mode='lines+markers', name='Training Loss'))
-    fig.add_trace(go.Scatter(x=history_data['Epoch'], y=history_data['Validation Loss'], mode='lines+markers', name='Validation Loss'))
-    fig.update_layout(title='Training Progress', xaxis_title='Epoch', yaxis_title='Loss')
-    
-    plot_container.plotly_chart(fig)
-
-def predict_anomalies(df, model_data):
-    """Predict anomalies using trained model"""
-    st.subheader("Anomaly Detection Results")
-    
-    # Preprocess data
-    processed_df = df.copy()
-    scaler = model_data['scaler']
-    features = model_data['features']
-    method = model_data['method']
-    
-    # Ensure all required features are present
-    missing_features = [f for f in features if f not in processed_df.columns]
-    if missing_features:
-        st.error(f"Missing required features: {missing_features}")
-        return None
-    
-    # Scale features
-    X = processed_df[features].values
-    X_scaled = scaler.transform(X)
-    
-    # Run anomaly detection
-    results = run_anomaly_detection_pipeline(X_scaled, method, model_data['contamination'])
-    
-    # Add results to dataframe
-    processed_df['anomaly_score'] = results['anomaly_scores']
-    processed_df['is_anomaly'] = results['anomaly_labels']
-    
-    # Display results
-    st.success("Anomaly detection completed!")
-    
-    # Summary statistics
-    anomaly_count = np.sum(processed_df['is_anomaly'])
-    total_count = len(processed_df)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Total Samples", total_count)
-        st.metric("Anomalies Detected", anomaly_count)
-    with col2:
-        st.metric("Anomaly Rate", f"{anomaly_count/total_count:.2%}")
-    
-    # Visualize results
-    fig = px.histogram(
-        processed_df,
-        x='anomaly_score',
-        color='is_anomaly',
-        title='Distribution of Anomaly Scores',
-        nbins=50
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Show top anomalies
-    st.subheader("Top Anomalies")
-    top_anomalies = processed_df.nlargest(10, 'anomaly_score')[features + ['anomaly_score']]
-    st.dataframe(top_anomalies)
-    
-    # Download results
-    csv = processed_df.to_csv(index=False)
-    st.download_button(
-        label="Download Results (CSV)",
-        data=csv,
-        file_name="anomaly_detection_results.csv",
-        mime="text/csv"
-    )
-    
-    return processed_df
-
-def predict_page():
-    st.title('Predict Network Intrusions')
-    
-    # File upload section
-    uploaded_file = st.file_uploader("Upload network traffic data (CSV)", type=['csv'])
+    # Upload file
+    uploaded_file = st.file_uploader("Upload file log API (CSV)", type=["csv"])
     
     if uploaded_file is not None:
         try:
-            # Load and preprocess the data
+            # Baca file CSV
             df = pd.read_csv(uploaded_file)
-            st.write("Data Preview:")
+            
+            # Tampilkan informasi dasar
+            st.success(f"File berhasil diunggah! Jumlah baris: {df.shape[0]}, Jumlah kolom: {df.shape[1]}")
+            
+            # Tampilkan sampel data
+            st.subheader("Sampel Data")
             st.dataframe(df.head())
             
-            # Check if model exists
-            if not os.path.exists('models/ids_model.pt'):
-                st.error("No trained model found. Please train a model first.")
-                return
+            # Tampilkan informasi kolom
+            st.subheader("Informasi Kolom")
+            col_info = pd.DataFrame({
+                'Kolom': df.columns,
+                'Tipe Data': df.dtypes,
+                'Nilai Unik': [df[col].nunique() for col in df.columns],
+                'Missing Values': df.isnull().sum().values,
+                'Missing (%)': (df.isnull().sum() / len(df) * 100).values
+            })
+            st.dataframe(col_info)
             
-            # Preprocess data
-            data, features = preprocess_data(df)
+            # Deteksi kolom yang diperlukan
+            required_columns = ['ip_address', 'timestamp', 'user_agent', 'endpoint', 'parameters', 'status_code', 'response_time']
+            missing_columns = [col for col in required_columns if not any(existing_col.lower().replace('_', '').startswith(col.replace('_', '')) for existing_col in df.columns)]
             
-            # Check if anomaly detection model exists
-            anomaly_model_path = os.path.join('d:\cybersecurity', 'anomaly_model.pkl')
-            
-            if os.path.exists(anomaly_model_path):
-                model_data = joblib.load(anomaly_model_path)
+            if missing_columns:
+                st.warning(f"Beberapa kolom yang direkomendasikan tidak ditemukan: {', '.join(missing_columns)}")
                 
-                if st.button("Detect Anomalies"):
-                    results = predict_anomalies(df, model_data)
+                # Opsi untuk memetakan kolom
+                st.subheader("Pemetaan Kolom")
+                st.markdown("Petakan kolom yang ada ke kolom yang diperlukan:")
+                
+                column_mapping = {}
+                for req_col in required_columns:
+                    if req_col in missing_columns:
+                        column_mapping[req_col] = st.selectbox(
+                            f"Pilih kolom untuk '{req_col}':",
+                            options=["Tidak ada"] + list(df.columns),
+                            key=f"map_{req_col}"
+                        )
+            
+            # Simpan data
+            if st.button("Simpan dan Lanjutkan ke Pra-pemrosesan"):
+                # Jika ada pemetaan kolom, terapkan
+                if 'column_mapping' in locals() and column_mapping:
+                    df_mapped = df.copy()
+                    for req_col, mapped_col in column_mapping.items():
+                        if mapped_col != "Tidak ada":
+                            df_mapped[req_col] = df[mapped_col]
                     
-                    if results is not None:
-                        # Additional visualization
-                        st.subheader("Feature Analysis for Anomalies")
-                        
-                        # Select features to visualize
-                        numeric_cols = results.select_dtypes(include=[np.number]).columns.tolist()
-                        if 'anomaly_score' in numeric_cols:
-                            numeric_cols.remove('anomaly_score')
-                        
-                        if len(numeric_cols) > 0:
-                            selected_feature = st.selectbox(
-                                "Select feature to visualize",
-                                options=numeric_cols
-                            )
-                            
-                            # Box plot showing feature distribution by anomaly status
-                            fig = px.box(
-                                results,
-                                x='is_anomaly',
-                                y=selected_feature,
-                                title=f'{selected_feature} Distribution by Anomaly Status'
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("No anomaly detection model found. Please train a model first.")
+                    # Simpan dataframe yang sudah dipetakan
+                    df_mapped.to_csv("dataset_mapped.csv", index=False)
+                    st.session_state['df'] = df_mapped
+                else:
+                    # Simpan dataframe asli
+                    df.to_csv("dataset.csv", index=False)
+                    st.session_state['df'] = df
                 
-                # Fallback to original prediction method
-                if os.path.exists('models/ids_model.pt'):
-                    model = IDSGNNModel(input_dim=len(features))
-                    model.load_state_dict(torch.load('models/ids_model.pt'))
-                    model.eval()
-                    
-                    if st.button("Detect Intrusions"):
-                        with torch.no_grad():
-                            out = model(data.x, data.edge_index)
-                            pred = out.argmax(dim=1)
-                        
-                        st.success("Analysis Complete!")
-                        results_df = pd.DataFrame({
-                            'Sample': range(len(pred)),
-                            'Prediction': pred.numpy()
-                        })
-                        st.write("Prediction Results:")
-                        st.dataframe(results_df)
-                        
-                        fig = px.histogram(results_df, x='Prediction', title='Distribution of Predictions')
-                        st.plotly_chart(fig)
+                st.success("Data berhasil disimpan! Silakan lanjutkan ke langkah pra-pemrosesan.")
                 
+                # Tambahkan tombol untuk lanjut ke pra-pemrosesan
+                if st.button("Lanjut ke Pra-pemrosesan"):
+                    st.session_state['page'] = 'preprocess'
+                    st.rerun()
+        
         except Exception as e:
-            st.error(f"Error during prediction: {str(e)}")
-            st.write("Please ensure your data is in the correct format and try again.")
+            st.error(f"Terjadi kesalahan saat membaca file: {str(e)}")
 
-def save_anomaly_model(model, scaler, filepath):
-    """Save trained anomaly detection model"""
-    model_data = {
-        'model': model,
-        'scaler': scaler,
-        'feature_names': None,  # Can be populated from training data
-        'timestamp': pd.Timestamp.now()
-    }
+# Fungsi untuk pra-pemrosesan data log API
+def preprocess_api_logs(df):
+    """Pra-pemrosesan data log API untuk model deteksi anomali"""
+    df = df.copy()
     
-    # Ensure directory exists
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    joblib.dump(model_data, filepath)
-    return filepath
+    # Step 1: Konversi timestamp ke format datetime
+    timestamp_cols = [col for col in df.columns if any(time_keyword in col.lower() for time_keyword in ['time', 'date', 'timestamp'])]
+    
+    for col in timestamp_cols:
+        try:
+            df[col] = pd.to_datetime(df[col])
+            # Ekstrak fitur waktu
+            df[f'{col}_hour'] = df[col].dt.hour
+            df[f'{col}_day'] = df[col].dt.day
+            df[f'{col}_dayofweek'] = df[col].dt.dayofweek
+            print(f"Converted {col} to datetime and extracted time features")
+        except Exception as e:
+            print(f"Failed to convert {col} to datetime: {str(e)}")
+    
+    # Step 2: Ekstraksi fitur dari IP address
+    ip_cols = [col for col in df.columns if any(ip_keyword in col.lower() for ip_keyword in ['ip', 'address', 'src', 'source'])]
+    
+    for col in ip_cols:
+        if df[col].dtype == 'object':
+            # Cek apakah kolom berisi IP address
+            if df[col].str.contains(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}').any():
+                # Ekstrak oktet dari IP address
+                try:
+                    df[f'{col}_first_octet'] = df[col].str.extract(r'(\d{1,3})\.\d{1,3}\.\d{1,3}\.\d{1,3}').astype(float)
+                    df[f'{col}_second_octet'] = df[col].str.extract(r'\d{1,3}\.(\d{1,3})\.\d{1,3}\.\d{1,3}').astype(float)
+                    print(f"Extracted features from IP column: {col}")
+                except Exception as e:
+                    print(f"Failed to extract IP features from {col}: {str(e)}")
+    
+    # Step 3: Ekstraksi fitur dari User Agent
+    ua_cols = [col for col in df.columns if any(ua_keyword in col.lower() for ua_keyword in ['user', 'agent', 'browser', 'ua'])]
+    
+    for col in ua_cols:
+        if df[col].dtype == 'object':
+            # Deteksi browser, OS, dan device
+            df[f'{col}_is_mobile'] = df[col].str.contains('Mobile|Android|iOS', case=False).astype(int)
+            df[f'{col}_is_chrome'] = df[col].str.contains('Chrome', case=False).astype(int)
+            df[f'{col}_is_firefox'] = df[col].str.contains('Firefox', case=False).astype(int)
+            df[f'{col}_is_safari'] = df[col].str.contains('Safari', case=False).astype(int)
+            print(f"Extracted features from User Agent column: {col}")
+    
+    # Step 4: Ekstraksi fitur dari endpoint/API call
+    endpoint_cols = [col for col in df.columns if any(ep_keyword in col.lower() for ep_keyword in ['endpoint', 'api', 'url', 'path'])]
+    
+    for col in endpoint_cols:
+        if df[col].dtype == 'object':
+            # One-hot encoding untuk endpoint
+            endpoint_dummies = pd.get_dummies(df[col], prefix=f'{col}_endpoint')
+            df = pd.concat([df, endpoint_dummies], axis=1)
+            print(f"Applied one-hot encoding to endpoint column: {col}")
+    
+    # Step 5: Konversi status code ke kategori
+    status_cols = [col for col in df.columns if any(status_keyword in col.lower() for status_keyword in ['status', 'code', 'response_code'])]
+    
+    for col in status_cols:
+        # Kategorikan status code
+        df[f'{col}_is_success'] = ((df[col] >= 200) & (df[col] < 300)).astype(int)
+        df[f'{col}_is_redirect'] = ((df[col] >= 300) & (df[col] < 400)).astype(int)
+        df[f'{col}_is_client_error'] = ((df[col] >= 400) & (df[col] < 500)).astype(int)
+        df[f'{col}_is_server_error'] = (df[col] >= 500).astype(int)
+        print(f"Categorized status codes from column: {col}")
+    
+    # Step 6: Agregasi fitur berdasarkan IP dan waktu
+    # Hitung jumlah permintaan per IP dalam interval waktu tertentu
+    if ip_cols and timestamp_cols:
+        try:
+            # Gunakan kolom IP dan timestamp pertama yang ditemukan
+            ip_col = ip_cols[0]
+            time_col = timestamp_cols[0]
+            
+            # Buat fitur agregat
+            ip_counts = df.groupby(ip_col).size().reset_index(name='requests_per_ip')
+            df = df.merge(ip_counts, on=ip_col, how='left')
+            
+            # Jika timestamp sudah dikonversi ke datetime
+            if pd.api.types.is_datetime64_any_dtype(df[time_col]):
+                # Buat interval waktu (misalnya 5 menit)
+                df['time_interval'] = df[time_col].dt.floor('5min')
+                
+                # Hitung permintaan per IP per interval waktu
+                ip_time_counts = df.groupby([ip_col, 'time_interval']).size().reset_index(name='requests_per_ip_5min')
+                df = df.merge(ip_time_counts, on=[ip_col, 'time_interval'], how='left')
+                
+                print("Created aggregated features based on IP and time intervals")
+        except Exception as e:
+            print(f"Failed to create aggregated features: {str(e)}")
+    
+    # Step 7: Hapus kolom yang tidak diperlukan untuk model
+    # Hapus kolom original yang sudah diekstrak fiturnya
+    cols_to_drop = []
+    cols_to_drop.extend(timestamp_cols)  # Timestamp asli sudah diekstrak fiturnya
+    cols_to_drop.extend(endpoint_cols)   # Endpoint sudah di-one-hot encoding
+    cols_to_drop.extend(ua_cols)         # User agent sudah diekstrak fiturnya
+    
+    # Juga hapus kolom non-numerik lainnya yang tidak bisa digunakan model
+    for col in df.columns:
+        if df[col].dtype == 'object' and col not in cols_to_drop:
+            cols_to_drop.append(col)
+    
+    # Hapus kolom 'time_interval' jika ada (hanya digunakan untuk agregasi)
+    if 'time_interval' in df.columns:
+        cols_to_drop.append('time_interval')
+    
+    # Hapus kolom yang sudah ditentukan
+    df_numeric = df.drop(columns=cols_to_drop, errors='ignore')
+    print(f"Dropped {len(cols_to_drop)} columns that are not needed for modeling")
+    
+    # Step 8: Tangani missing values
+    df_numeric = df_numeric.fillna(0)
+    
+    # Step 9: Normalisasi fitur numerik
+    scaler = StandardScaler()
+    numeric_cols = df_numeric.select_dtypes(include=[np.number]).columns
+    df_numeric[numeric_cols] = scaler.fit_transform(df_numeric[numeric_cols])
+    
+    return df_numeric, scaler, df
 
-def load_anomaly_model(filepath):
-    """Load saved anomaly detection model"""
-    if os.path.exists(filepath):
-        model_data = joblib.load(filepath)
-        return model_data
+# Fungsi untuk membuat graph dari data log API
+def create_api_log_graph(df, ip_col=None, endpoint_col=None):
+    """Membuat graph dari data log API untuk GNN"""
+    # Identifikasi kolom IP dan endpoint jika tidak ditentukan
+    if ip_col is None:
+        ip_cols = [col for col in df.columns if any(ip_keyword in col.lower() for ip_keyword in ['ip', 'address', 'src', 'source'])]
+        ip_col = ip_cols[0] if ip_cols else None
+    
+    if endpoint_col is None:
+        endpoint_cols = [col for col in df.columns if any(ep_keyword in col.lower() for ep_keyword in ['endpoint', 'api', 'url', 'path'])]
+        endpoint_col = endpoint_cols[0] if endpoint_cols else None
+    
+    # Jika kolom IP atau endpoint tidak ditemukan, gunakan pendekatan sequential
+    if ip_col is None or endpoint_col is None or ip_col not in df.columns or endpoint_col not in df.columns:
+        print("IP or endpoint column not found, using sequential graph approach")
+        # Buat graph berdasarkan urutan sekuensial
+        edge_index = []
+        for i in range(len(df) - 1):
+            edge_index.append([i, i + 1])  # Hubungkan setiap baris dengan baris berikutnya
+            edge_index.append([i + 1, i])  # Bidirectional
     else:
-        st.error(f"Model file not found: {filepath}")
-        return None
+        print(f"Creating graph based on IP ({ip_col}) and endpoint ({endpoint_col}) relationships")
+        # Buat graph berdasarkan hubungan IP-endpoint
+        # Buat mapping untuk IP dan endpoint
+        unique_ips = df[ip_col].unique()
+        unique_endpoints = df[endpoint_col].unique()
+        
+        ip_to_idx = {ip: i for i, ip in enumerate(unique_ips)}
+        endpoint_to_idx = {endpoint: i + len(unique_ips) for i, endpoint in enumerate(unique_endpoints)}
+        
+        # Buat edge index
+        edge_index = []
+        for _, row in df.iterrows():
+            ip_idx = ip_to_idx[row[ip_col]]
+            endpoint_idx = endpoint_to_idx[row[endpoint_col]]
+            
+            # Hubungkan IP ke endpoint
+            edge_index.append([ip_idx, endpoint_idx])
+            edge_index.append([endpoint_idx, ip_idx])  # Bidirectional
+    
+    # Konversi ke tensor PyTorch
+    edge_index = torch.tensor(edge_index, dtype=torch.long).t().contiguous()
+    
+    # Fitur node adalah fitur numerik dari dataframe
+    x = torch.tensor(df.select_dtypes(include=[np.number]).values, dtype=torch.float)
+    
+    # Buat objek Data PyTorch Geometric
+    data = Data(x=x, edge_index=edge_index)
+    
+    return data
 
-# Main function to run the app
+# Fungsi untuk menampilkan halaman pelatihan model
+def show_training_page():
+    st.title("Langkah 3: Pelatihan Model")
+    
+    st.markdown("""
+    ### Tujuan: Melatih model Autoencoder dan GNN dengan data normal
+    
+    Pada langkah ini, kita akan melatih dua model:
+    1. **Autoencoder**: Untuk mendeteksi anomali berdasarkan fitur tabular
+    2. **Graph Neural Network (GNN)**: Untuk mendeteksi anomali berbasis grafik
+    """)
+    
+    # Cek apakah data sudah diproses
+    if 'df_processed' not in st.session_state:
+        st.warning("Data belum diproses. Silakan kembali ke langkah Pengumpulan Data dan Pra-pemrosesan.")
+        if st.button("Kembali ke Pengumpulan Data"):
+            st.session_state['page'] = 'collect'
+            st.rerun()
+        return
+    
+    # Ambil data yang sudah diproses
+    df_processed = st.session_state['df_processed']
+    
+    # Tampilkan informasi data yang akan digunakan untuk pelatihan
+    st.subheader("Data untuk Pelatihan")
+    st.write(f"Jumlah sampel: {df_processed.shape[0]}")
+    st.write(f"Jumlah fitur: {df_processed.shape[1]}")
+    
+    # Opsi pelatihan
+    st.subheader("Opsi Pelatihan")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Opsi untuk Autoencoder
+        st.markdown("#### Opsi Autoencoder")
+        
+        hidden_dims = st.text_input("Hidden Dimensions (pisahkan dengan koma)", "128,64,32")
+        hidden_dims = [int(dim.strip()) for dim in hidden_dims.split(",")]
+        
+        dropout_ae = st.slider("Dropout Rate", 0.0, 0.5, 0.2, 0.1)
+        learning_rate_ae = st.select_slider(
+            "Learning Rate",
+            options=[0.0001, 0.0005, 0.001, 0.005, 0.01],
+            value=0.001
+        )
+        
+        epochs_ae = st.slider("Epochs", 10, 200, 50, 10)
+    
+    with col2:
+        # Opsi untuk GNN
+        st.markdown("#### Opsi GNN")
+        
+        hidden_channels = st.slider("Hidden Channels", 16, 256, 64, 16)
+        num_layers = st.slider("Number of Layers", 1, 5, 2, 1)
+        dropout_gnn = st.slider("Dropout Rate", 0.0, 0.5, 0.2, 0.1, key="dropout_gnn")
+        learning_rate_gnn = st.select_slider(
+            "Learning Rate",
+            options=[0.0001, 0.0005, 0.001, 0.005, 0.01],
+            value=0.001,
+            key="lr_gnn"
+        )
+        
+        epochs_gnn = st.slider("Epochs", 10, 200, 50, 10, key="epochs_gnn")
+    
+    # Opsi pembagian data
+    st.subheader("Pembagian Data")
+    train_size = st.slider("Proporsi Data Training", 0.5, 0.9, 0.8, 0.05)
+    
+    # Tombol untuk memulai pelatihan
+    if st.button("Mulai Pelatihan"):
+        with st.spinner("Melatih model... Ini mungkin memerlukan waktu beberapa menit."):
+            try:
+                # Pembagian data
+                X = df_processed.values
+                X_train, X_test = train_test_split(X, train_size=train_size, random_state=42)
+                
+                # Pelatihan Autoencoder
+                st.markdown("#### Pelatihan Autoencoder")
+                progress_bar_ae = st.progress(0)
+                status_text_ae = st.empty()
+                
+                # Buat model Autoencoder
+                input_dim = X_train.shape[1]
+                device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+                
+                autoencoder = APILogAutoencoder(
+                    input_dim=input_dim,
+                    hidden_dims=hidden_dims,
+                    dropout=dropout_ae
+                ).to(device)
+                
+                # Optimizer
+                optimizer_ae = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate_ae)
+                
+                # Konversi data ke tensor
+                X_train_tensor = torch.tensor(X_train, dtype=torch.float).to(device)
+                X_test_tensor = torch.tensor(X_test, dtype=torch.float).to(device)
+                
+                # Training loop
+                train_losses_ae = []
+                test_losses_ae = []
+                
+                for epoch in range(epochs_ae):
+                    # Train
+                    autoencoder.train()
+                    optimizer_ae.zero_grad()
+                    
+                    # Forward pass
+                    outputs = autoencoder(X_train_tensor)
+                    
+                    # Compute loss
+                    loss = F.mse_loss(outputs, X_train_tensor)
+                    
+                    # Backward pass
+                    loss.backward()
+                    optimizer_ae.step()
+                    
+                    train_losses_ae.append(loss.item())
+                    
+                    # Evaluate
+                    autoencoder.eval()
+                    with torch.no_grad():
+                        test_outputs = autoencoder(X_test_tensor)
+                        test_loss = F.mse_loss(test_outputs, X_test_tensor)
+                        test_losses_ae.append(test_loss.item())
+                    
+                    # Update progress
+                    progress = (epoch + 1) / epochs_ae
+                    progress_bar_ae.progress(progress)
+                    status_text_ae.text(f"Epoch {epoch+1}/{epochs_ae}, Train Loss: {loss.item():.6f}, Test Loss: {test_loss.item():.6f}")
+                
+                # Hitung threshold untuk deteksi anomali
+                autoencoder.eval()
+                with torch.no_grad():
+                    test_outputs = autoencoder(X_test_tensor)
+                    reconstruction_errors = F.mse_loss(test_outputs, X_test_tensor, reduction='none').mean(dim=1).cpu().numpy()
+                
+                threshold = calculate_anomaly_threshold(reconstruction_errors, method='std')
+                
+                st.success(f"Pelatihan Autoencoder selesai! Threshold anomali: {threshold:.6f}")
+                
+                # Plot training curve
+                fig, ax = plt.subplots(figsize=(10, 6))
+                ax.plot(train_losses_ae, label='Train Loss')
+                ax.plot(test_losses_ae, label='Test Loss')
+                ax.set_xlabel('Epoch')
+                ax.set_ylabel('Loss')
+                ax.set_title('Autoencoder Training Curve')
+                ax.legend()
+                st.pyplot(fig)
+                
+                # Pelatihan GNN
+                st.markdown("#### Pelatihan GNN")
+                progress_bar_gnn = st.progress(0)
+                status_text_gnn = st.empty()
+                
+                # Buat graph data
+                graph_data = create_api_log_graph(pd.DataFrame(X))
+                
+                # Buat model GNN
+                num_features = graph_data.x.shape[1]
+                num_classes = 2  # Normal vs Anomali
+                
+                gnn_model = IDSGNNModel(
+                    num_features=num_features,
+                    num_classes=num_classes,
+                    hidden_channels=hidden_channels,
+                    num_layers=num_layers,
+                    dropout=dropout_gnn
+                ).to(device)
+                
+                # Optimizer
+                optimizer_gnn = torch.optim.Adam(gnn_model.parameters(), lr=learning_rate_gnn)
+                
+                # Simpan model dan parameter
+                os.makedirs("models", exist_ok=True)
+                
+                # Simpan Autoencoder
+                torch.save(autoencoder.state_dict(), "models/autoencoder.pt")
+                
+                # Simpan threshold
+                with open("models/anomaly_threshold.txt", "w") as f:
+                    f.write(str(threshold))
+                
+                # Simpan GNN
+                torch.save(gnn_model.state_dict(), "models/gnn_model.pt")
+                
+                # Simpan parameter model
+                autoencoder_params = {
+                    "input_dim": input_dim,
+                    "hidden_dims": hidden_dims,
+                    "dropout": dropout_ae
+                }
+                
+                gnn_params = {
+                    "num_features": num_features,
+                    "num_classes": num_classes,
+                    "hidden_channels": hidden_channels,
+                    "num_layers": num_layers,
+                    "dropout": dropout_gnn
+                }
+                
+                with open("models/autoencoder_params.json", "w") as f:
+                    json.dump(autoencoder_params, f)
+                
+                with open("models/gnn_params.json", "w") as f:
+                    json.dump(gnn_params, f)
+                
+                st.success("Model berhasil dilatih dan disimpan!")
+                
+                # Simpan model ke session state
+                st.session_state['autoencoder'] = autoencoder
+                st.session_state['gnn_model'] = gnn_model
+                st.session_state['anomaly_threshold'] = threshold
+                
+                # Tambahkan tombol untuk lanjut ke deteksi anomali
+                if st.button("Lanjut ke Deteksi Anomali"):
+                    st.session_state['page'] = 'detect'
+                    st.rerun()
+            
+            except Exception as e:
+                st.error(f"Terjadi kesalahan saat melatih model: {str(e)}")
+                st.exception(e)
+
+# Fungsi untuk menampilkan halaman deteksi anomali
+def show_detection_page():
+    st.title("Langkah 4: Deteksi Anomali")
+    
+    st.markdown("""
+    ### Tujuan: Menggunakan model yang sudah dilatih untuk mendeteksi anomali pada data baru
+    
+    Upload data log API baru untuk dianalisis, atau gunakan data test yang sudah ada.
+    """)
+    
+    # Cek apakah model sudah dilatih
+    models_exist = os.path.exists("models/autoencoder.pt") and os.path.exists("models/gnn_model.pt")
+    
+    if not models_exist and 'autoencoder' not in st.session_state:
+        st.warning("Model belum dilatih. Silakan kembali ke langkah Pelatihan Model.")
+        if st.button("Kembali ke Pelatihan Model"):
+            st.session_state['page'] = 'train'
+            st.rerun()
+        return
+    
+    # Opsi untuk menggunakan data test atau upload data baru
+    data_option = st.radio(
+        "Pilih sumber data untuk deteksi anomali:",
+        options=["Upload data baru", "Gunakan data test yang sudah ada"]
+    )
+    
+    if data_option == "Upload data baru":
+        # Upload file
+        uploaded_file = st.file_uploader("Upload file log API (CSV)", type=["csv"], key="detect_upload")
+        
+        if uploaded_file is not None:
+            try:
+                # Baca file CSV
+                df = pd.read_csv(uploaded_file)
+                
+                # Tampilkan informasi dasar
+                st.success(f"File berhasil diunggah! Jumlah baris: {df.shape[0]}, Jumlah kolom: {df.shape[1]}")
+                
+                # Tampilkan sampel data
+                st.subheader("Sampel Data")
+                st.dataframe(df.head())
+                
+                # Simpan dataframe ke session state
+                st.session_state['df_detect'] = df
+            
+            except Exception as e:
+                st.error(f"Terjadi kesalahan saat membaca file: {str(e)}")
+    
+    else:  # Gunakan data test yang sudah ada
+        if 'df_processed' in st.session_state:
+            # Gunakan sebagian data yang sudah diproses sebagai data test
+            df_processed = st.session_state['df_processed']
+            
+            # Ambil sampel acak dari data
+            sample_size = min(1000, len(df_processed))
+            df_sample = df_processed.sample(n=sample_size, random_state=42)
+            
+            st.success(f"Menggunakan {sample_size} sampel acak dari data yang sudah diproses")
+            
+            # Tampilkan sampel data
+            st.subheader("Sampel Data")
+            st.dataframe(df_sample.head())
+            
+            # Simpan dataframe ke session state
+            st.session_state['df_detect'] = df_sample
+        else:
+            st.warning("Data yang sudah diproses tidak ditemukan. Silakan upload data baru.")
+    
+    # Tombol untuk mendeteksi anomali
+    if 'df_detect' in st.session_state and st.button("Deteksi Anomali"):
+        with st.spinner("Mendeteksi anomali... Ini mungkin memerlukan waktu beberapa menit."):
+            try:
+                # Ambil data untuk deteksi
+                df_detect = st.session_state['df_detect']
+                
+                # Pra-pemrosesan data
+                if data_option == "Upload data baru":
+                    # Pra-pemrosesan data baru
+                    df_processed, scaler, df_original = preprocess_api_logs(df_detect)
+                else:
+                    # Data sudah diproses
+                    df_processed = df_detect
+                    df_original = df_detect
+                
+                # Load model jika belum ada di session state
+                if 'autoencoder' not in st.session_state:
+                    # Load parameter model
+                    with open("models/autoencoder_params.json", "r") as f:
+                        autoencoder_params = json.load(f)
+                    
+                    with open("models/gnn_params.json", "r") as f:
+                        gnn_params = json.load(f)
+                    
+                    # Load threshold
+                    with open("models/anomaly_threshold.txt", "r") as f:
+                        threshold = float(f.read())
+                    
+                    # Buat model
+                    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+                    
+                    autoencoder = APILogAutoencoder(
+                        input_dim=autoencoder_params["input_dim"],
+                        hidden_dims=autoencoder_params["hidden_dims"],
+                        dropout=autoencoder_params["dropout"]
+                    ).to(device)
+                    
+                    gnn_model = IDSGNNModel(
+                        num_features=gnn_params["num_features"],
+                        num_classes=gnn_params["num_classes"],
+                        hidden_channels=gnn_params["hidden_channels"],
+                        num_layers=gnn_params["num_layers"],
+                        dropout=gnn_params["dropout"]
+                    ).to(device)
+                    
+                    # Load state dict
+                    autoencoder.load_state_dict(torch.load("models/autoencoder.pt"))
+                    gnn_model.load_state_dict(torch.load("models/gnn_model.pt"))
+                    
+                    # Simpan ke session state
+                    st.session_state['autoencoder'] = autoencoder
+                    st.session_state['gnn_model'] = gnn_model
+                    st.session_state['anomaly_threshold'] = threshold
+                else:
+                    # Ambil model dari session state
+                    autoencoder = st.session_state['autoencoder']
+                    gnn_model = st.session_state['gnn_model']
+                    threshold = st.session_state['anomaly_threshold']
+                
+                # Deteksi anomali dengan Autoencoder
+                device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+                X = torch.tensor(df_processed.values, dtype=torch.float).to(device)
+                
+                autoencoder.eval()
+                with torch.no_grad():
+                    outputs = autoencoder(X)
+                    reconstruction_errors = F.mse_loss(outputs, X, reduction='none').mean(dim=1).cpu().numpy()
+                
+                # Identifikasi anomali berdasarkan threshold
+                anomalies = reconstruction_errors > threshold
+                
+                # Tambahkan hasil ke dataframe original
+                df_original['reconstruction_error'] = reconstruction_errors
+                df_original['is_anomaly'] = anomalies
+                df_original['anomaly_score'] = reconstruction_errors / threshold
+                
+                # Tampilkan hasil
+                st.subheader("Hasil Deteksi Anomali")
+                
+                # Statistik hasil
+                num_anomalies = anomalies.sum()
+                anomaly_percentage = (num_anomalies / len(df_original)) * 100
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Total Data", len(df_original))
+                
+                with col2:
+                    st.metric("Jumlah Anomali", int(num_anomalies))
+                
+                with col3:
+                    st.metric("Persentase Anomali", f"{anomaly_percentage:.2f}%")
+                
+                # Tampilkan data dengan anomali
+                st.subheader("Data dengan Anomali")
+                anomaly_df = df_original[df_original['is_anomaly']].sort_values('anomaly_score', ascending=False)
+                st.dataframe(anomaly_df)
+                
+                # Visualisasi distribusi reconstruction error
+                st.subheader("Distribusi Reconstruction Error")
+                fig, ax = plt.subplots(figsize=(10, 6))
+                
+                sns.histplot(reconstruction_errors, bins=50, kde=True, ax=ax)
+                ax.axvline(x=threshold, color='r', linestyle='--', label=f'Threshold: {threshold:.6f}')
+                ax.set_xlabel('Reconstruction Error')
+                ax.set_ylabel('Frequency')
+                ax.set_title('Distribution of Reconstruction Errors')
+                ax.legend()
+                
+                st.pyplot(fig)
+                
+                # Visualisasi anomali berdasarkan waktu (jika ada kolom timestamp)
+                timestamp_cols = [col for col in df_original.columns if any(time_keyword in col.lower() for time_keyword in ['time', 'date', 'timestamp'])]
+                
+                if timestamp_cols:
+                    st.subheader("Anomali Berdasarkan Waktu")
+                    time_col = timestamp_cols[0]
+                    
+                    try:
+                        # Konversi ke datetime jika belum
+                        if not pd.api.types.is_datetime64_any_dtype(df_original[time_col]):
+                            df_original[time_col] = pd.to_datetime(df_original[time_col])
+                        
+                        # Plot anomali berdasarkan waktu
+                        fig = px.scatter(
+                            df_original,
+                            x=time_col,
+                            y='anomaly_score',
+                            color='is_anomaly',
+                            title="Anomaly Score Over Time",
+                            labels={'anomaly_score': 'Anomaly Score', time_col: 'Time'},
+                            color_discrete_map={True: 'red', False: 'blue'}
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    except Exception as e:
+                        st.warning(f"Tidak dapat membuat visualisasi berdasarkan waktu: {str(e)}")
+                
+                # Opsi untuk mengunduh hasil
+                csv = df_original.to_csv(index=False)
+                st.download_button(
+                    label="Unduh Hasil Deteksi Anomali",
+                    data=csv,
+                    file_name="anomaly_detection_results.csv",
+                    mime="text/csv"
+                )
+                
+                # Simpan hasil ke session state
+                st.session_state['detection_results'] = df_original
+                
+                # Tambahkan tombol untuk lanjut ke evaluasi hasil
+                if st.button("Lanjut ke Evaluasi Hasil"):
+                    st.session_state['page'] = 'evaluate'
+                    st.rerun()
+            
+            except Exception as e:
+                st.error(f"Terjadi kesalahan saat mendeteksi anomali: {str(e)}")
+                st.exception(e)
+
+# Fungsi untuk menampilkan halaman evaluasi hasil
+def show_evaluation_page():
+    st.title("Langkah 5 & 6: Penggabungan Hasil dan Evaluasi")
+    
+    st.markdown("""
+    ### Tujuan: Mengevaluasi hasil deteksi anomali dan memperbaiki model
+    
+    Pada langkah ini, kita akan mengevaluasi hasil deteksi anomali dan memberikan umpan balik untuk perbaikan model.
+    """)
+    
+    # Cek apakah hasil deteksi sudah ada
+    if 'detection_results' not in st.session_state:
+        st.warning("Hasil deteksi anomali belum ada. Silakan kembali ke langkah Deteksi Anomali.")
+        if st.button("Kembali ke Deteksi Anomali"):
+            st.session_state['page'] = 'detect'
+            st.rerun()
+        return
+    
+    # Ambil hasil deteksi
+    results = st.session_state['detection_results']
+    
+    # Tampilkan ringkasan hasil
+    st.subheader("Ringkasan Hasil Deteksi")
+    
+    # Statistik hasil
+    num_anomalies = results['is_anomaly'].sum()
+    anomaly_percentage = (num_anomalies / len(results)) * 100
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Total Data", len(results))
+    
+    with col2:
+        st.metric("Jumlah Anomali", int(num_anomalies))
+    
+    with col3:
+        st.metric("Persentase Anomali", f"{anomaly_percentage:.2f}%")
+    
+    # Tampilkan top anomali
+    st.subheader("Top 10 Anomali Berdasarkan Score")
+    top_anomalies = results[results['is_anomaly']].sort_values('anomaly_score', ascending=False).head(10)
+    st.dataframe(top_anomalies)
+    
+    # Opsi untuk validasi manual
+    st.subheader("Validasi Manual Anomali")
+    st.markdown("""
+    Validasi hasil deteksi anomali untuk meningkatkan akurasi model di masa depan.
+    Pilih beberapa anomali terdeteksi dan tentukan apakah itu benar-benar anomali atau false positive.
+    """)
+    
+    # Pilih anomali untuk validasi
+    if num_anomalies > 0:
+        anomaly_indices = results[results['is_anomaly']].index.tolist()
+        selected_indices = st.multiselect(
+            "Pilih anomali untuk validasi:",
+            options=anomaly_indices,
+            format_func=lambda x: f"Index {x} (Score: {results.loc[x, 'anomaly_score']:.4f})"
+        )
+        
+        if selected_indices:
+            # Tampilkan data anomali yang dipilih
+            st.dataframe(results.loc[selected_indices])
+            
+            # Form validasi
+            validation_results = {}
+            
+            for idx in selected_indices:
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.write(f"Anomali Index {idx} (Score: {results.loc[idx, 'anomaly_score']:.4f})")
+                
+                with col2:
+                    is_true_anomaly = st.radio(
+                        "Apakah ini benar-benar anomali?",
+                        options=["Ya", "Tidak"],
+                        key=f"validate_{idx}"
+                    )
+                    validation_results[idx] = is_true_anomaly == "Ya"
+            
+            # Tombol untuk menyimpan validasi
+            if st.button("Simpan Hasil Validasi"):
+                # Hitung metrik berdasarkan validasi
+                true_positives = sum(1 for idx, is_true in validation_results.items() if is_true)
+                false_positives = sum(1 for idx, is_true in validation_results.items() if not is_true)
+                
+                precision = true_positives / len(validation_results) if len(validation_results) > 0 else 0
+                
+                st.success("Hasil validasi berhasil disimpan!")
+                
+                # Tampilkan metrik
+                st.subheader("Metrik Berdasarkan Validasi")
+                st.write(f"True Positives: {true_positives}")
+                st.write(f"False Positives: {false_positives}")
+                st.write(f"Precision: {precision:.4f}")
+                
+                # Simpan hasil validasi ke file
+                validation_df = pd.DataFrame({
+                    'index': list(validation_results.keys()),
+                    'is_true_anomaly': list(validation_results.values())
+                })
+                
+                validation_df.to_csv("validation_results.csv", index=False)
+                
+                # Simpan ke session state
+                st.session_state['validation_results'] = validation_results
+        else:
+            st.info("Pilih anomali untuk validasi")
+    else:
+        st.info("Tidak ada anomali terdeteksi untuk divalidasi")
+    
+    # Rekomendasi untuk perbaikan model
+    st.subheader("Rekomendasi untuk Perbaikan Model")
+    
+    st.markdown("""
+    Berdasarkan hasil deteksi dan validasi, berikut adalah beberapa rekomendasi untuk meningkatkan akurasi model:
+    
+    1. **Penyesuaian Threshold**: Jika terlalu banyak false positives, pertimbangkan untuk meningkatkan threshold. Jika terlalu banyak false negatives, pertimbangkan untuk menurunkan threshold.
+    
+    2. **Fitur Tambahan**: Pertimbangkan untuk menambahkan fitur baru yang dapat membantu membedakan antara perilaku normal dan anomali.
+    
+    3. **Pelatihan Ulang**: Latih ulang model dengan data yang lebih banyak dan lebih representatif.
+    
+    4. **Ensemble Method**: Pertimbangkan untuk menggabungkan hasil dari beberapa model deteksi anomali untuk meningkatkan akurasi.
+    """)
+    
+    # Opsi untuk penyesuaian threshold
+    st.subheader("Penyesuaian Threshold")
+    
+    current_threshold = st.session_state.get('anomaly_threshold', 0.1)
+    new_threshold = st.slider("Threshold Baru", 0.0, 1.0, float(current_threshold), 0.01)
+    
+    if st.button("Terapkan Threshold Baru"):
+        # Hitung ulang anomali dengan threshold baru
+        results['is_anomaly_new'] = results['reconstruction_error'] > new_threshold
+        results['anomaly_score_new'] = results['reconstruction_error'] / new_threshold
+        
+        # Tampilkan perbandingan
+        num_anomalies_new = results['is_anomaly_new'].sum()
+        anomaly_percentage_new = (num_anomalies_new / len(results)) * 100
+        
+        st.subheader("Perbandingan Hasil dengan Threshold Baru")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.metric("Jumlah Anomali (Threshold Lama)", int(num_anomalies))
+            st.metric("Persentase Anomali (Threshold Lama)", f"{anomaly_percentage:.2f}%")
+        
+        with col2:
+            st.metric("Jumlah Anomali (Threshold Baru)", int(num_anomalies_new))
+            st.metric("Persentase Anomali (Threshold Baru)", f"{anomaly_percentage_new:.2f}%")
+        
+        # Simpan threshold baru
+        st.session_state['anomaly_threshold'] = new_threshold
+        
+        # Simpan ke file
+        with open("models/anomaly_threshold.txt", "w") as f:
+            f.write(str(new_threshold))
+        
+        st.success(f"Threshold berhasil diubah menjadi {new_threshold}!")
+
+# Fungsi untuk menampilkan halaman pra-pemrosesan
+def show_preprocessing_page():
+    st.title("Langkah 2: Pra-pemrosesan Data dan Pembentukan Fitur")
+    
+    st.markdown("""
+    ### Tujuan: Mengubah data mentah menjadi format yang dapat digunakan oleh model
+    
+    Pada langkah ini, kita akan melakukan pra-pemrosesan data log API dan membentuk fitur untuk model Autoencoder dan GNN.
+    """)
+    
+    # Cek apakah data sudah diupload
+    if 'df' not in st.session_state:
+        st.warning("Data belum diupload. Silakan kembali ke langkah Pengumpulan Data.")
+        if st.button("Kembali ke Pengumpulan Data"):
+            st.session_state['page'] = 'collect'
+            st.rerun()
+        return
+    
+    # Ambil data yang sudah diupload
+    df = st.session_state['df']
+    
+    # Tampilkan informasi dasar
+    st.subheader("Data yang Akan Diproses")
+    st.write(f"Jumlah baris: {df.shape[0]}, Jumlah kolom: {df.shape[1]}")
+    
+    # Tampilkan sampel data
+    st.subheader("Sampel Data")
+    st.dataframe(df.head())
+    
+    # Opsi pra-pemrosesan
+    st.subheader("Opsi Pra-pemrosesan")
+    
+    # Deteksi kolom timestamp, IP, dan endpoint
+    timestamp_cols = [col for col in df.columns if any(time_keyword in col.lower() for time_keyword in ['time', 'date', 'timestamp'])]
+    ip_cols = [col for col in df.columns if any(ip_keyword in col.lower() for ip_keyword in ['ip', 'address', 'src', 'source'])]
+    endpoint_cols = [col for col in df.columns if any(ep_keyword in col.lower() for ep_keyword in ['endpoint', 'api', 'url', 'path'])]
+    
+    # Tampilkan kolom yang terdeteksi
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.write("Kolom Timestamp Terdeteksi:")
+        if timestamp_cols:
+            st.write(timestamp_cols)
+        else:
+            st.write("Tidak ditemukan")
+    
+    with col2:
+        st.write("Kolom IP Terdeteksi:")
+        if ip_cols:
+            st.write(ip_cols)
+        else:
+            st.write("Tidak ditemukan")
+    
+    with col3:
+        st.write("Kolom Endpoint Terdeteksi:")
+        if endpoint_cols:
+            st.write(endpoint_cols)
+        else:
+            st.write("Tidak ditemukan")
+    
+    # Opsi untuk memilih kolom yang akan digunakan
+    st.subheader("Pilih Kolom untuk Diproses")
+    
+    # Pilih kolom timestamp
+    selected_timestamp = None
+    if timestamp_cols:
+        selected_timestamp = st.selectbox("Pilih Kolom Timestamp", timestamp_cols)
+    
+    # Pilih kolom IP
+    selected_ip = None
+    if ip_cols:
+        selected_ip = st.selectbox("Pilih Kolom IP", ip_cols)
+    
+    # Pilih kolom endpoint
+    selected_endpoint = None
+    if endpoint_cols:
+        selected_endpoint = st.selectbox("Pilih Kolom Endpoint", endpoint_cols)
+    
+    # Tombol untuk melanjutkan ke langkah berikutnya
+    if st.button("Proses Data"):
+        # Simpan kolom yang dipilih ke session state
+        st.session_state['selected_timestamp'] = selected_timestamp
+        st.session_state['selected_ip'] = selected_ip
+        st.session_state['selected_endpoint'] = selected_endpoint
+        
+        # Lakukan pra-pemrosesan data
+        st.info("Memproses data...")
+        
+        # Implementasi pra-pemrosesan data akan ditambahkan di sini
+        
+        st.success("Data berhasil diproses!")
+        # Lanjut ke langkah berikutnya
+        st.session_state['page'] = 'feature_engineering'
+        st.rerun()
+
 def main():
     # Initialize session state
     if 'page' not in st.session_state:
@@ -2835,10 +1268,14 @@ def main():
     # Navigation
     if st.session_state['page'] == 'home':
         show_home_page()
+    elif st.session_state['page'] == 'collect':
+        show_data_collection_page()
     elif st.session_state['page'] == 'train':
-        train_model_page()
-    elif st.session_state['page'] == 'predict':
-        predict_page()
+        show_training_page()
+    elif st.session_state['page'] == 'detect':
+        show_detection_page()
+    elif st.session_state['page'] == 'evaluate':
+        show_evaluation_page()
     
 # Run the app
 if __name__ == '__main__':

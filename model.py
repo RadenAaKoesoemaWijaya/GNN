@@ -506,3 +506,120 @@ def main(train_loader, val_loader, test_loader, num_features, num_classes, devic
     print(f"Test F1 Score: {test_f1:.4f}")
     
     return final_model, best_params, test_acc
+
+
+class APILogAutoencoder(torch.nn.Module):
+    def __init__(self, input_dim, hidden_dims=[128, 64, 32], dropout=0.2):
+        super(APILogAutoencoder, self).__init__()
+        
+        # Encoder layers
+        self.encoder_layers = nn.ModuleList()
+        
+        # First encoder layer
+        self.encoder_layers.append(nn.Linear(input_dim, hidden_dims[0]))
+        
+        # Additional encoder layers
+        for i in range(1, len(hidden_dims)):
+            self.encoder_layers.append(nn.Linear(hidden_dims[i-1], hidden_dims[i]))
+        
+        # Decoder layers (in reverse)
+        self.decoder_layers = nn.ModuleList()
+        
+        # Build decoder layers in reverse order
+        for i in range(len(hidden_dims)-1, 0, -1):
+            self.decoder_layers.append(nn.Linear(hidden_dims[i], hidden_dims[i-1]))
+        
+        # Final decoder layer to original dimensions
+        self.decoder_layers.append(nn.Linear(hidden_dims[0], input_dim))
+        
+        self.dropout = dropout
+    
+    def encode(self, x):
+        # Pass through encoder layers
+        for layer in self.encoder_layers:
+            x = F.relu(layer(x))
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        return x
+    
+    def decode(self, x):
+        # Pass through decoder layers
+        for layer in self.decoder_layers:
+            x = F.relu(layer(x))
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        return x
+    
+    def forward(self, x):
+        # Encode
+        encoded = self.encode(x)
+        # Decode
+        decoded = self.decode(encoded)
+        return decoded
+
+def train_autoencoder(model, train_loader, optimizer, device):
+    """Train the autoencoder model"""
+    model.train()
+    total_loss = 0
+    
+    for data in train_loader:
+        # For autoencoders, input is also the target
+        inputs = data.x.to(device)
+        optimizer.zero_grad()
+        
+        # Forward pass
+        outputs = model(inputs)
+        
+        # Compute reconstruction loss
+        loss = F.mse_loss(outputs, inputs)
+        
+        # Backward pass and optimize
+        loss.backward()
+        optimizer.step()
+        
+        total_loss += loss.item() * inputs.size(0)
+    
+    avg_loss = total_loss / len(train_loader.dataset)
+    return avg_loss
+
+def evaluate_autoencoder(model, loader, device, threshold=None):
+    """Evaluate the autoencoder model and detect anomalies"""
+    model.eval()
+    total_loss = 0
+    reconstruction_errors = []
+    
+    with torch.no_grad():
+        for data in loader:
+            inputs = data.x.to(device)
+            
+            # Forward pass
+            outputs = model(inputs)
+            
+            # Compute reconstruction error for each sample
+            errors = F.mse_loss(outputs, inputs, reduction='none').mean(dim=1)
+            reconstruction_errors.extend(errors.cpu().numpy())
+            
+            # Compute average loss
+            loss = F.mse_loss(outputs, inputs)
+            total_loss += loss.item() * inputs.size(0)
+    
+    avg_loss = total_loss / len(loader.dataset)
+    reconstruction_errors = np.array(reconstruction_errors)
+    
+    # Detect anomalies if threshold is provided
+    anomalies = None
+    if threshold is not None:
+        anomalies = reconstruction_errors > threshold
+    
+    return avg_loss, reconstruction_errors, anomalies
+
+def calculate_anomaly_threshold(errors, method='std', contamination=0.01):
+    """Calculate anomaly threshold based on reconstruction errors"""
+    if method == 'std':
+        # Use mean + n*std as threshold
+        threshold = np.mean(errors) + 3 * np.std(errors)
+    elif method == 'percentile':
+        # Use percentile as threshold
+        threshold = np.percentile(errors, 100 * (1 - contamination))
+    else:
+        raise ValueError(f"Unsupported threshold method: {method}")
+    
+    return threshold
