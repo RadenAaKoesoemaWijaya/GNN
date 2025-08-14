@@ -15,7 +15,7 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
-from model import IDSGNNModel, APILogAutoencoder
+from model import IDSGNNModel, APILogAutoencoder, calculate_anomaly_threshold
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif, VarianceThreshold
 from sklearn.decomposition import PCA
 import re
@@ -501,11 +501,11 @@ def create_api_log_graph(df, ip_col=None, endpoint_col=None):
     """Membuat graph dari data log API untuk GNN"""
     # Identifikasi kolom IP dan endpoint jika tidak ditentukan
     if ip_col is None:
-        ip_cols = [col for col in df.columns if any(ip_keyword in col.lower() for ip_keyword in ['ip', 'address', 'src', 'source'])]
+        ip_cols = [str(col) for col in df.columns if any(ip_keyword in str(col).lower() for ip_keyword in ['ip', 'address', 'src', 'source'])]
         ip_col = ip_cols[0] if ip_cols else None
     
     if endpoint_col is None:
-        endpoint_cols = [col for col in df.columns if any(ep_keyword in col.lower() for ep_keyword in ['endpoint', 'api', 'url', 'path'])]
+        endpoint_cols = [str(col) for col in df.columns if any(ep_keyword in str(col).lower() for ep_keyword in ['endpoint', 'api', 'url', 'path'])]
         endpoint_col = endpoint_cols[0] if endpoint_cols else None
     
     # Jika kolom IP atau endpoint tidak ditemukan, gunakan pendekatan sequential
