@@ -15,7 +15,7 @@ import os
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, classification_report
-from model import IDSGNNModel
+from model import IDSGNNModel, APILogAutoencoder
 from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif, VarianceThreshold
 from sklearn.decomposition import PCA
 import re
@@ -287,7 +287,7 @@ def show_home_page():
 
 # Fungsi untuk menampilkan halaman pengumpulan data
 def show_data_collection_page():
-    st.title("Langkah 1: Pengumpulan Data Log API")
+    st.title("Pengumpulan Data Log API")
     
     st.markdown("""
     ### Tujuan: Mengumpulkan data mentah untuk analisis
@@ -549,7 +549,7 @@ def create_api_log_graph(df, ip_col=None, endpoint_col=None):
 
 # Fungsi untuk menampilkan halaman pelatihan model
 def show_training_page():
-    st.title("Langkah 3: Pelatihan Model")
+    st.title("Pelatihan Model")
     
     st.markdown("""
     ### Tujuan: Melatih model Autoencoder dan GNN dengan data normal
@@ -1002,7 +1002,7 @@ def show_detection_page():
 
 # Fungsi untuk menampilkan halaman evaluasi hasil
 def show_evaluation_page():
-    st.title("Langkah 5 & 6: Penggabungan Hasil dan Evaluasi")
+    st.title("Penggabungan Hasil dan Evaluasi")
     
     st.markdown("""
     ### Tujuan: Mengevaluasi hasil deteksi anomali dan memperbaiki model
@@ -1165,7 +1165,7 @@ def show_evaluation_page():
 
 # Fungsi untuk menampilkan halaman pra-pemrosesan
 def show_preprocessing_page():
-    st.title("Langkah 2: Pra-pemrosesan Data dan Pembentukan Fitur")
+    st.title("Pra-pemrosesan Data dan Pembentukan Fitur")
     
     st.markdown("""
     ### Tujuan: Mengubah data mentah menjadi format yang dapat digunakan oleh model
