@@ -226,7 +226,7 @@ def show_home_page():
             <br/>
         </div>
         """, unsafe_allow_html=True)
-        collect_button = st.button("Pengumpulan Data", key="collect_nav")
+        collect_button = st.button("Pengumpulan Data", key="collect")
     
     with col2:
         st.markdown("""
@@ -236,7 +236,7 @@ def show_home_page():
             <br/>
         </div>
         """, unsafe_allow_html=True)
-        train_button = st.button("Pelatihan Model", key="train_nav")
+        train_button = st.button("Pelatihan Model", key="train")
     
     with col3:
         st.markdown("""
@@ -246,7 +246,7 @@ def show_home_page():
             <br/>
         </div>
         """, unsafe_allow_html=True)
-        detect_button = st.button("Deteksi Anomali", key="detect_nav")
+        detect_button = st.button("Deteksi Anomali", key="detect")
     
     if collect_button:
         st.session_state['page'] = 'collect'
@@ -348,7 +348,7 @@ def show_data_collection_page():
                             key=f"map_{req_col}"
                         )
             
-            # Simpan data
+            # Simpan data dan lanjut ke preprocessing
             if st.button("Simpan dan Lanjutkan ke Pra-pemrosesan"):
                 # Jika ada pemetaan kolom, terapkan
                 if 'column_mapping' in locals() and column_mapping:
@@ -365,12 +365,11 @@ def show_data_collection_page():
                     df.to_csv("dataset.csv", index=False)
                     st.session_state['df'] = df
                 
-                st.success("Data berhasil disimpan! Silakan lanjutkan ke langkah pra-pemrosesan.")
+                st.success("Data berhasil disimpan! Lanjut ke langkah pra-pemrosesan...")
                 
-                # Tambahkan tombol untuk lanjut ke pra-pemrosesan
-                if st.button("Lanjut ke Pra-pemrosesan"):
-                    st.session_state['page'] = 'preprocess'
-                    st.rerun()
+                # Langsung navigasi ke halaman preprocessing
+                st.session_state['page'] = 'preprocess'
+                st.rerun()
         
         except Exception as e:
             st.error(f"Terjadi kesalahan saat membaca file: {str(e)}")
@@ -1171,7 +1170,7 @@ def show_preprocessing_page():
     st.markdown("""
     ### Tujuan: Mengubah data mentah menjadi format yang dapat digunakan oleh model
     
-    Pada langkah ini, kita akan melakukan pra-pemrosesan data log API dan membentuk fitur untuk model Autoencoder dan GNN.
+    Pada langkah ini, kita akan melakukan pra-pemrosesan data log API dan membentuk fitur untuk model Autoencoder dan GNN dengan visualisasi detail setiap tahapnya.
     """)
     
     # Cek apakah data sudah diupload
@@ -1183,15 +1182,52 @@ def show_preprocessing_page():
         return
     
     # Ambil data yang sudah diupload
-    df = st.session_state['df']
+    df = st.session_state['df'].copy()
     
     # Tampilkan informasi dasar
     st.subheader("Data yang Akan Diproses")
     st.write(f"Jumlah baris: {df.shape[0]}, Jumlah kolom: {df.shape[1]}")
     
     # Tampilkan sampel data
-    st.subheader("Sampel Data")
+    st.subheader("Sampel Data Mentah")
     st.dataframe(df.head())
+    
+    # Analisis tipe data dan missing values
+    st.subheader("Analisis Data Awal")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Total Baris", df.shape[0])
+        st.metric("Total Kolom", df.shape[1])
+    
+    with col2:
+        missing_pct = (df.isnull().sum().sum() / (df.shape[0] * df.shape[1])) * 100
+        st.metric("Missing Values (%)", f"{missing_pct:.2f}%")
+        duplicate_pct = (df.duplicated().sum() / len(df)) * 100
+        st.metric("Duplikat (%)", f"{duplicate_pct:.2f}%")
+    
+    with col3:
+        numeric_cols = len(df.select_dtypes(include=[np.number]).columns)
+        categorical_cols = len(df.select_dtypes(include=['object']).columns)
+        st.metric("Kolom Numerik", numeric_cols)
+        st.metric("Kolom Kategorikal", categorical_cols)
+    
+    # Visualisasi distribusi tipe data
+    st.subheader("Distribusi Tipe Data")
+    col_types = df.dtypes.value_counts()
+    fig, ax = plt.subplots(figsize=(8, 4))
+    col_types.plot(kind='bar', ax=ax)
+    ax.set_title("Distribusi Tipe Data Kolom")
+    ax.set_xlabel("Tipe Data")
+    ax.set_ylabel("Jumlah Kolom")
+    st.pyplot(fig)
+    
+    # Heatmap missing values
+    st.subheader("Peta Missing Values")
+    fig, ax = plt.subplots(figsize=(12, 6))
+    sns.heatmap(df.isnull(), cbar=True, ax=ax, cmap='viridis')
+    ax.set_title("Visualisasi Missing Values")
+    st.pyplot(fig)
     
     # Opsi pra-pemrosesan
     st.subheader("Opsi Pra-pemrosesan")
@@ -1244,7 +1280,7 @@ def show_preprocessing_page():
         selected_endpoint = st.selectbox("Pilih Kolom Endpoint", endpoint_cols)
     
     # Tombol untuk melanjutkan ke langkah berikutnya
-    if st.button("Proses Data"):
+    if st.button("Proses Data dengan Visualisasi Detail"):
         # Simpan kolom yang dipilih ke session state
         st.session_state['selected_timestamp'] = selected_timestamp
         st.session_state['selected_ip'] = selected_ip
@@ -1305,6 +1341,426 @@ def show_preprocessing_page():
             st.error(f"Terjadi kesalahan saat memproses data: {str(e)}")
             st.write("Detail error:")
             st.exception(e)
+        
+        # Lakukan pra-pemrosesan data dengan visualisasi detail
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        # Container untuk visualisasi tiap tahap
+        viz_container = st.container()
+        
+        try:
+            # Tahap 1: Konversi timestamp
+            status_text.text("Tahap 1: Konversi Timestamp...")
+            progress_bar.progress(10)
+            
+            with viz_container:
+                st.subheader("📅 Tahap 1: Konversi Timestamp")
+                
+                if selected_timestamp:
+                    original_col = df[selected_timestamp]
+                    
+                    # Konversi timestamp
+                    try:
+                        df[selected_timestamp] = pd.to_datetime(df[selected_timestamp])
+                        
+                        # Visualisasi perubahan tipe data
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write("Tipe Data Awal:", original_col.dtype)
+                            st.write("Contoh data:", original_col.iloc[0])
+                        with col2:
+                            st.write("Tipe Data Baru:", df[selected_timestamp].dtype)
+                            st.write("Contoh data:", df[selected_timestamp].iloc[0])
+                        
+                        # Ekstrak fitur waktu
+                        df[f'{selected_timestamp}_hour'] = df[selected_timestamp].dt.hour
+                        df[f'{selected_timestamp}_day'] = df[selected_timestamp].dt.day
+                        df[f'{selected_timestamp}_dayofweek'] = df[selected_timestamp].dt.dayofweek
+                        
+                        # Visualisasi distribusi waktu
+                        fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+                        
+                        # Distribusi jam
+                        df[f'{selected_timestamp}_hour'].hist(bins=24, ax=axes[0])
+                        axes[0].set_title("Distribusi Jam")
+                        axes[0].set_xlabel("Jam")
+                        
+                        # Distribusi hari dalam bulan
+                        df[f'{selected_timestamp}_day'].hist(bins=31, ax=axes[1])
+                        axes[1].set_title("Distribusi Hari dalam Bulan")
+                        axes[1].set_xlabel("Hari")
+                        
+                        # Distribusi hari dalam minggu
+                        df[f'{selected_timestamp}_dayofweek'].hist(bins=7, ax=axes[2])
+                        axes[2].set_title("Distribusi Hari dalam Minggu")
+                        axes[2].set_xlabel("Hari (0=Senin)")
+                        
+                        st.pyplot(fig)
+                        
+                    except Exception as e:
+                        st.error(f"Gagal mengkonversi timestamp: {str(e)}")
+                else:
+                    st.warning("Tidak ada kolom timestamp yang dipilih")
+            
+            # Tahap 2: Ekstraksi fitur IP
+            status_text.text("Tahap 2: Ekstraksi Fitur IP...")
+            progress_bar.progress(25)
+            
+            with viz_container:
+                st.subheader("🌐 Tahap 2: Ekstraksi Fitur dari IP Address")
+                
+                if selected_ip and selected_ip in df.columns:
+                    original_col = df[selected_ip]
+                    
+                    # Ekstrak fitur IP
+                    try:
+                        df[f'{selected_ip}_first_octet'] = df[selected_ip].str.extract(r'(\d{1,3})\.\d{1,3}\.\d{1,3}\.\d{1,3}').astype(float)
+                        df[f'{selected_ip}_second_octet'] = df[selected_ip].str.extract(r'\d{1,3}\.(\d{1,3})\.\d{1,3}\.\d{1,3}').astype(float)
+                        
+                        # Visualisasi distribusi oktet IP
+                        fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+                        
+                        # Distribusi first octet
+                        df[f'{selected_ip}_first_octet'].hist(bins=20, ax=axes[0])
+                        axes[0].set_title("Distribusi First Octet IP")
+                        axes[0].set_xlabel("First Octet")
+                        
+                        # Distribusi second octet
+                        df[f'{selected_ip}_second_octet'].hist(bins=20, ax=axes[1])
+                        axes[1].set_title("Distribusi Second Octet IP")
+                        axes[1].set_xlabel("Second Octet")
+                        
+                        st.pyplot(fig)
+                        
+                        # Tampilkan statistik
+                        st.write("Statistik IP Address:")
+                        ip_stats = pd.DataFrame({
+                            'First Octet': [df[f'{selected_ip}_first_octet'].mean(), df[f'{selected_ip}_first_octet'].std()],
+                            'Second Octet': [df[f'{selected_ip}_second_octet'].mean(), df[f'{selected_ip}_second_octet'].std()]
+                        }, index=['Mean', 'Std'])
+                        st.dataframe(ip_stats)
+                        
+                    except Exception as e:
+                        st.error(f"Gagal mengekstrak fitur IP: {str(e)}")
+                else:
+                    st.warning("Tidak ada kolom IP yang dipilih")
+            
+            # Tahap 3: Ekstraksi fitur User Agent
+            status_text.text("Tahap 3: Ekstraksi Fitur User Agent...")
+            progress_bar.progress(40)
+            
+            with viz_container:
+                st.subheader("👤 Tahap 3: Ekstraksi Fitur dari User Agent")
+                
+                ua_cols = [col for col in df.columns if any(ua_keyword in col.lower() for ua_keyword in ['user', 'agent', 'browser', 'ua'])]
+                
+                if ua_cols:
+                    ua_col = ua_cols[0]  # Gunakan kolom pertama
+                    
+                    # Ekstrak fitur User Agent
+                    df[f'{ua_col}_is_mobile'] = df[ua_col].str.contains('Mobile|Android|iOS', case=False).astype(int)
+                    df[f'{ua_col}_is_chrome'] = df[ua_col].str.contains('Chrome', case=False).astype(int)
+                    df[f'{ua_col}_is_firefox'] = df[ua_col].str.contains('Firefox', case=False).astype(int)
+                    df[f'{ua_col}_is_safari'] = df[ua_col].str.contains('Safari', case=False).astype(int)
+                    
+                    # Visualisasi distribusi browser
+                    browser_counts = pd.DataFrame({
+                        'Mobile': [df[f'{ua_col}_is_mobile'].sum()],
+                        'Chrome': [df[f'{ua_col}_is_chrome'].sum()],
+                        'Firefox': [df[f'{ua_col}_is_firefox'].sum()],
+                        'Safari': [df[f'{ua_col}_is_safari'].sum()]
+                    }).T
+                    
+                    fig, ax = plt.subplots(figsize=(10, 4))
+                    browser_counts.plot(kind='bar', ax=ax)
+                    ax.set_title("Distribusi Tipe Browser dari User Agent")
+                    ax.set_ylabel("Jumlah")
+                    ax.set_xlabel("Tipe Browser")
+                    plt.xticks(rotation=45)
+                    st.pyplot(fig)
+                    
+                    # Tampilkan persentase
+                    st.write("Persentase Tipe Browser:")
+                    total_rows = len(df)
+                    browser_pct = pd.DataFrame({
+                        'Jumlah': [df[f'{ua_col}_is_mobile'].sum(), df[f'{ua_col}_is_chrome'].sum(), 
+                                  df[f'{ua_col}_is_firefox'].sum(), df[f'{ua_col}_is_safari'].sum()],
+                        'Persentase (%)': [(df[f'{ua_col}_is_mobile'].sum()/total_rows)*100, 
+                                          (df[f'{ua_col}_is_chrome'].sum()/total_rows)*100,
+                                          (df[f'{ua_col}_is_firefox'].sum()/total_rows)*100,
+                                          (df[f'{ua_col}_is_safari'].sum()/total_rows)*100]
+                    }, index=['Mobile', 'Chrome', 'Firefox', 'Safari'])
+                    st.dataframe(browser_pct)
+                    
+                else:
+                    st.warning("Tidak ada kolom User Agent yang ditemukan")
+            
+            # Tahap 4: One-hot encoding endpoint
+            status_text.text("Tahap 4: One-hot Encoding Endpoint...")
+            progress_bar.progress(55)
+            
+            with viz_container:
+                st.subheader("🔗 Tahap 4: One-hot Encoding untuk Endpoint")
+                
+                if selected_endpoint and selected_endpoint in df.columns:
+                    # One-hot encoding
+                    endpoint_dummies = pd.get_dummies(df[selected_endpoint], prefix=f'{selected_endpoint}_endpoint')
+                    
+                    # Visualisasi endpoint yang paling sering muncul
+                    endpoint_counts = df[selected_endpoint].value_counts().head(10)
+                    
+                    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+                    
+                    # Top 10 endpoint
+                    endpoint_counts.plot(kind='bar', ax=ax1)
+                    ax1.set_title("Top 10 Endpoint yang Paling Sering Muncul")
+                    ax1.set_xlabel("Endpoint")
+                    ax1.set_ylabel("Frekuensi")
+                    plt.xticks(rotation=45)
+                    
+                    # Distribusi one-hot encoding
+                    if len(endpoint_dummies.columns) <= 20:  # Tampilkan hanya jika tidak terlalu banyak
+                        endpoint_dummies.sum().plot(kind='bar', ax=ax2)
+                        ax2.set_title("Distribusi One-hot Encoded Features")
+                        ax2.set_xlabel("Feature")
+                        ax2.set_ylabel("Jumlah True")
+                        plt.xticks(rotation=45)
+                    else:
+                        ax2.text(0.5, 0.5, f"Terdapat {len(endpoint_dummies.columns)}\nfitur one-hot encoding", 
+                                ha='center', va='center', transform=ax2.transAxes, fontsize=14)
+                        ax2.set_title("Jumlah Fitur One-hot Encoding")
+                    
+                    st.pyplot(fig)
+                    
+                    # Gabungkan ke dataframe utama
+                    df = pd.concat([df, endpoint_dummies], axis=1)
+                    
+                    st.write(f"Jumlah fitur baru dari one-hot encoding: {len(endpoint_dummies.columns)}")
+                    
+                else:
+                    st.warning("Tidak ada kolom endpoint yang dipilih")
+            
+            # Tahap 5: Kategorisasi status code
+            status_text.text("Tahap 5: Kategorisasi Status Code...")
+            progress_bar.progress(70)
+            
+            with viz_container:
+                st.subheader("📊 Tahap 5: Kategorisasi Status Code")
+                
+                status_cols = [col for col in df.columns if any(status_keyword in col.lower() for status_keyword in ['status', 'code', 'response_code'])]
+                
+                if status_cols:
+                    status_col = status_cols[0]
+                    
+                    # Kategorikan status code
+                    df[f'{status_col}_is_success'] = ((df[status_col] >= 200) & (df[status_col] < 300)).astype(int)
+                    df[f'{status_col}_is_redirect'] = ((df[status_col] >= 300) & (df[status_col] < 400)).astype(int)
+                    df[f'{status_col}_is_client_error'] = ((df[status_col] >= 400) & (df[status_col] < 500)).astype(int)
+                    df[f'{status_col}_is_server_error'] = (df[status_col] >= 500).astype(int)
+                    
+                    # Visualisasi distribusi kategori
+                    status_categories = pd.DataFrame({
+                        'Success (2xx)': [df[f'{status_col}_is_success'].sum()],
+                        'Redirect (3xx)': [df[f'{status_col}_is_redirect'].sum()],
+                        'Client Error (4xx)': [df[f'{status_col}_is_client_error'].sum()],
+                        'Server Error (5xx)': [df[f'{status_col}_is_server_error'].sum()]
+                    }).T
+                    
+                    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
+                    
+                    # Pie chart
+                    ax1.pie(status_categories.values.flatten(), labels=status_categories.index, autopct='%1.1f%%')
+                    ax1.set_title("Distribusi Kategori Status Code")
+                    
+                    # Bar chart
+                    status_categories.plot(kind='bar', ax=ax2)
+                    ax2.set_title("Jumlah per Kategori Status Code")
+                    ax2.set_ylabel("Jumlah")
+                    ax2.set_xlabel("Kategori")
+                    plt.xticks(rotation=45)
+                    
+                    st.pyplot(fig)
+                    
+                    # Tampilkan distribusi status code asli
+                    st.write("Distribusi Status Code Asli (Top 10):")
+                    status_dist = df[status_col].value_counts().head(10)
+                    st.dataframe(status_dist)
+                    
+                else:
+                    st.warning("Tidak ada kolom status code yang ditemukan")
+            
+            # Tahap 6: Agregasi fitur
+            status_text.text("Tahap 6: Agregasi Fitur...")
+            progress_bar.progress(85)
+            
+            with viz_container:
+                st.subheader("📈 Tahap 6: Agregasi Fitur Berdasarkan IP dan Waktu")
+                
+                if selected_ip and selected_timestamp and selected_ip in df.columns and selected_timestamp in df.columns:
+                    try:
+                        # Agregasi berdasarkan IP
+                        ip_counts = df.groupby(selected_ip).size().reset_index(name='requests_per_ip')
+                        
+                        # Visualisasi distribusi permintaan per IP
+                        fig, axes = plt.subplots(1, 2, figsize=(15, 4))
+                        
+                        # Top 20 IP dengan permintaan terbanyak
+                        top_ips = ip_counts.sort_values('requests_per_ip', ascending=False).head(20)
+                        top_ips.plot(x=selected_ip, y='requests_per_ip', kind='bar', ax=axes[0])
+                        axes[0].set_title("Top 20 IP dengan Permintaan Terbanyak")
+                        axes[0].set_xlabel("IP Address")
+                        axes[0].set_ylabel("Jumlah Permintaan")
+                        plt.xticks(rotation=45)
+                        
+                        # Distribusi permintaan per IP
+                        ip_counts['requests_per_ip'].hist(bins=50, ax=axes[1])
+                        axes[1].set_title("Distribusi Jumlah Permintaan per IP")
+                        axes[1].set_xlabel("Jumlah Permintaan")
+                        axes[1].set_ylabel("Frekuensi")
+                        
+                        st.pyplot(fig)
+                        
+                        # Gabungkan kembali ke dataframe
+                        df = df.merge(ip_counts, on=selected_ip, how='left')
+                        
+                        st.write(f"Jumlah IP unik: {len(ip_counts)}")
+                        st.write(f"Rata-rata permintaan per IP: {ip_counts['requests_per_ip'].mean():.2f}")
+                        
+                    except Exception as e:
+                        st.error(f"Gagal melakukan agregasi: {str(e)}")
+                else:
+                    st.warning("IP atau timestamp tidak tersedia untuk agregasi")
+            
+            # Tahap 7: Final preprocessing
+            status_text.text("Tahap 7: Final Preprocessing...")
+            progress_bar.progress(95)
+            
+            with viz_container:
+                st.subheader("🔧 Tahap 7: Final Preprocessing")
+                
+                # Identifikasi kolom untuk dihapus
+                cols_to_drop = []
+                cols_to_drop.extend([col for col in df.columns if any(time_keyword in col.lower() for time_keyword in ['time', 'date', 'timestamp'])])
+                cols_to_drop.extend([col for col in df.columns if any(ep_keyword in col.lower() for ep_keyword in ['endpoint', 'api', 'url', 'path'])])
+                cols_to_drop.extend([col for col in df.columns if any(ua_keyword in col.lower() for ua_keyword in ['user', 'agent', 'browser', 'ua'])])
+                
+                # Hapus kolom non-numerik
+                for col in df.columns:
+                    if df[col].dtype == 'object' and col not in cols_to_drop:
+                        cols_to_drop.append(col)
+                
+                # Hapus kolom yang tidak diperlukan
+                df_numeric = df.drop(columns=cols_to_drop, errors='ignore')
+                
+                # Tangani missing values
+                df_numeric = df_numeric.fillna(0)
+                
+                # Normalisasi fitur numerik
+                scaler = StandardScaler()
+                numeric_cols = df_numeric.select_dtypes(include=[np.number]).columns
+                df_normalized = df_numeric.copy()
+                df_normalized[numeric_cols] = scaler.fit_transform(df_numeric[numeric_cols])
+                
+                # Visualisasi perubahan distribusi sebelum dan sesudah normalisasi
+                st.subheader("Perbandingan Sebelum dan Sesudah Normalisasi")
+                
+                if len(numeric_cols) > 0:
+                    # Pilih 4 fitur pertama untuk visualisasi
+                    features_to_show = numeric_cols[:4]
+                    
+                    fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+                    axes = axes.flatten()
+                    
+                    for i, feature in enumerate(features_to_show):
+                        if i < len(axes):
+                            axes[i].hist(df_numeric[feature], bins=30, alpha=0.7, label='Sebelum Normalisasi', color='blue')
+                            axes[i].hist(df_normalized[feature], bins=30, alpha=0.7, label='Setelah Normalisasi', color='red')
+                            axes[i].set_title(f"Distribusi {feature}")
+                            axes[i].legend()
+                    
+                    st.pyplot(fig)
+                
+                # Ringkasan hasil preprocessing
+                st.subheader("📊 Ringkasan Hasil Preprocessing")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Fitur Awal", len(df.columns))
+                    st.metric("Fitur Akhir", len(df_normalized.columns))
+                
+                with col2:
+                    st.metric("Baris Data", len(df_normalized))
+                    st.metric("Missing Values", df_normalized.isnull().sum().sum())
+                
+                with col3:
+                    st.metric("Skewness Mean", df_normalized.skew().mean().round(2))
+                    st.metric("Kurtosis Mean", df_normalized.kurtosis().mean().round(2))
+                
+                # Simpan hasil preprocessing
+                st.session_state['df_processed'] = df_normalized
+                st.session_state['df_original'] = df
+                st.session_state['scaler'] = scaler
+                
+                # Buat grafik untuk GNN
+                graph_data = create_api_log_graph(df, ip_col=selected_ip, endpoint_col=selected_endpoint)
+                st.session_state['graph_data'] = graph_data
+                
+                # Persiapkan data untuk autoencoder
+                autoencoder_features = df_normalized.values
+                st.session_state['autoencoder_features'] = autoencoder_features
+                
+                # Visualisasi korelasi final
+                st.subheader("Heatmap Korelasi Fitur Final")
+                fig, ax = plt.subplots(figsize=(12, 8))
+                
+                # Pilih subset fitur untuk visualisasi jika terlalu banyak
+                if len(df_normalized.columns) > 20:
+                    # Pilih 20 fitur dengan variansi tertinggi
+                    top_features = df_normalized.var().nlargest(20).index
+                    sns.heatmap(df_normalized[top_features].corr(), annot=False, cmap='coolwarm', ax=ax)
+                    ax.set_title("Heatmap Korelasi - 20 Fitur dengan Variansi Tertinggi")
+                else:
+                    sns.heatmap(df_normalized.corr(), annot=False, cmap='coolwarm', ax=ax)
+                    ax.set_title("Heatmap Korelasi Semua Fitur")
+                
+                st.pyplot(fig)
+                
+                # Informasi grafik GNN
+                st.subheader("📊 Informasi Grafik untuk GNN")
+                st.write(f"Jumlah node: {graph_data.num_nodes}")
+                st.write(f"Jumlah edge: {graph_data.num_edges // 2}")  # Dibagi 2 karena bidirectional
+                st.write(f"Dimensi fitur per node: {graph_data.x.shape[1] if hasattr(graph_data, 'x') else 'Tidak tersedia'}")
+                
+                # Tampilkan sampel data final
+                st.subheader("Sampel Data Setelah Preprocessing")
+                st.dataframe(df_normalized.head())
+                
+                # Download hasil preprocessing
+                csv = df_normalized.to_csv(index=False)
+                st.download_button(
+                    label="Download Data Hasil Preprocessing (CSV)",
+                    data=csv,
+                    file_name="data_preprocessed.csv",
+                    mime="text/csv"
+                )
+                
+                # Selesai
+                progress_bar.progress(100)
+                status_text.text("Preprocessing selesai!")
+                
+                st.success("✅ Data berhasil diproses dengan visualisasi detail!")
+                
+                # Tombol untuk lanjut ke langkah berikutnya
+                if st.button("Lanjut ke Feature Engineering"):
+                    st.session_state['page'] = 'feature_engineering'
+                    st.rerun()
+                
+        except Exception as e:
+            st.error(f"Terjadi kesalahan saat memproses data: {str(e)}")
+            st.write("Detail error:")
+            st.exception(e)
 
 def main():
     # Initialize session state
@@ -1316,6 +1772,8 @@ def main():
         show_home_page()
     elif st.session_state['page'] == 'collect':
         show_data_collection_page()
+    elif st.session_state['page'] == 'preprocess':
+        show_preprocessing_page()
     elif st.session_state['page'] == 'train':
         show_training_page()
     elif st.session_state['page'] == 'detect':
