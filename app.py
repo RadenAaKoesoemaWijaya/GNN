@@ -1253,12 +1253,58 @@ def show_preprocessing_page():
         # Lakukan pra-pemrosesan data
         st.info("Memproses data...")
         
-        # Implementasi pra-pemrosesan data akan ditambahkan di sini
-        
-        st.success("Data berhasil diproses!")
-        # Lanjut ke langkah berikutnya
-        st.session_state['page'] = 'feature_engineering'
-        st.rerun()
+        # Implementasi pra-pemrosesan data
+        try:
+            # Panggil fungsi preprocessing untuk mengolah data mentah
+            df_processed, scaler, df_original = preprocess_api_logs(df)
+            
+            # Simpan hasil preprocessing ke session state
+            st.session_state['df_processed'] = df_processed
+            st.session_state['df_original'] = df_original
+            st.session_state['scaler'] = scaler
+            
+            # Buat grafik untuk GNN berdasarkan data yang sudah diproses
+            graph_data = create_api_log_graph(df_original, 
+                                             ip_col=selected_ip, 
+                                             endpoint_col=selected_endpoint)
+            
+            # Simpan graph data ke session state
+            st.session_state['graph_data'] = graph_data
+            
+            # Persiapkan data untuk autoencoder
+            # Autoencoder menggunakan fitur numerik dari df_processed
+            autoencoder_features = df_processed.values
+            st.session_state['autoencoder_features'] = autoencoder_features
+            
+            # Tampilkan informasi hasil preprocessing
+            st.subheader("Hasil Preprocessing")
+            st.write(f"Jumlah fitur setelah preprocessing: {df_processed.shape[1]}")
+            st.write(f"Fitur yang dihasilkan:")
+            st.write(df_processed.columns.tolist())
+            
+            # Tampilkan sampel data yang sudah diproses
+            st.subheader("Sampel Data Setelah Preprocessing")
+            st.dataframe(df_processed.head())
+            
+            # Tampilkan informasi grafik
+            st.subheader("Informasi Grafik untuk GNN")
+            st.write(f"Jumlah node: {graph_data.num_nodes}")
+            st.write(f"Jumlah edge: {graph_data.num_edges // 2}")  # Dibagi 2 karena bidirectional
+            
+            # Visualisasi distribusi fitur
+            st.subheader("Distribusi Fitur")
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.heatmap(df_processed.corr(), annot=False, cmap='coolwarm', ax=ax)
+            st.pyplot(fig)
+            
+            st.success("Data berhasil diproses!")
+            # Lanjut ke langkah berikutnya
+            st.session_state['page'] = 'feature_engineering'
+            st.rerun()
+        except Exception as e:
+            st.error(f"Terjadi kesalahan saat memproses data: {str(e)}")
+            st.write("Detail error:")
+            st.exception(e)
 
 def main():
     # Initialize session state
