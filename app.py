@@ -258,8 +258,39 @@ def show_home_page():
         st.rerun()
     
     if detect_button:
-        st.session_state['page'] = 'detect'
-        st.rerun()
+        # Cek apakah model sudah ada
+        models_exist = os.path.exists("models/autoencoder.pt") and os.path.exists("models/gnn_model.pt")
+        has_data = 'df_processed' in st.session_state
+        
+        if models_exist and has_data:
+            st.session_state['page'] = 'detect'
+            st.rerun()
+        else:
+            # Tampilkan pesan peringatan dengan opsi
+            st.warning("⚠️ Persyaratan untuk deteksi anomali belum terpenuhi!")
+            
+            if not models_exist:
+                st.info("🔧 Model belum dilatih. Anda perlu melatih model terlebih dahulu.")
+                if st.button("Lanjut ke Pelatihan Model", key="train_from_detect"):
+                    st.session_state['page'] = 'train'
+                    st.rerun()
+            
+            if not has_data:
+                st.info("📊 Data belum diproses. Anda perlu mengumpulkan dan memproses data terlebih dahulu.")
+                if st.button("Mulai dari Pengumpulan Data", key="collect_from_detect"):
+                    st.session_state['page'] = 'collect'
+                    st.rerun()
+            
+            # Jika salah satu sudah ada, beri opsi yang sesuai
+            if models_exist and not has_data:
+                st.info("📤 Anda bisa upload data baru untuk dideteksi")
+                st.session_state['page'] = 'detect'
+                st.rerun()
+            elif has_data and not models_exist:
+                st.info("🎯 Gunakan data yang sudah diproses untuk melatih model")
+                if st.button("Latih Model dengan Data Tersedia", key="train_with_existing"):
+                    st.session_state['page'] = 'train'
+                    st.rerun()
     
     # Tampilkan informasi tambahan tentang aplikasi
     st.markdown("""
@@ -785,12 +816,21 @@ def show_detection_page():
     
     # Cek apakah model sudah dilatih
     models_exist = os.path.exists("models/autoencoder.pt") and os.path.exists("models/gnn_model.pt")
+    has_trained_models = 'autoencoder' in st.session_state and 'gnn_model' in st.session_state
     
-    if not models_exist and 'autoencoder' not in st.session_state:
-        st.warning("Model belum dilatih. Silakan kembali ke langkah Pelatihan Model.")
-        if st.button("Kembali ke Pelatihan Model"):
-            st.session_state['page'] = 'train'
-            st.rerun()
+    if not models_exist and not has_trained_models:
+        st.error("❌ Model belum tersedia untuk deteksi anomali")
+        st.info("Anda perlu melatih model terlebih dahulu sebelum dapat mendeteksi anomali.")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📚 Pelatihan Model", type="primary"):
+                st.session_state['page'] = 'train'
+                st.rerun()
+        with col2:
+            if st.button("🏠 Kembali ke Beranda"):
+                st.session_state['page'] = 'home'
+                st.rerun()
         return
     
     # Opsi untuk menggunakan data test atau upload data baru
