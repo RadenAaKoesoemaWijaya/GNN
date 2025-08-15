@@ -1,103 +1,190 @@
-# Network Intrusion Detection System
+# GRAPHNET - API Log Anomaly Detection System
 
-A Graph Neural Network-based application for detecting network intrusions in network traffic data.
+A sophisticated machine learning application for detecting anomalies in API logs using Autoencoder and Graph Neural Networks (GNN) techniques.
 
 ## Overview
 
-This application uses Graph Neural Networks (GNNs) to analyze network traffic data and identify potential intrusions or attacks. It provides a user-friendly interface built with Streamlit that allows users to:
+GRAPHNET is a comprehensive anomaly detection system designed specifically for API log analysis. It combines the power of Autoencoders for feature learning and Graph Neural Networks for relationship modeling to identify unusual patterns in API usage.
 
-- Upload network traffic data in CSV format
-- Visualize network traffic patterns
-- Train new detection models or use existing ones
-- Analyze detection results with detailed visualizations
+## System Workflow
+
+The application follows a systematic 6-step workflow:
+
+### 1. Data Collection
+Upload your API log data in CSV format. The system supports logs containing:
+- **IP Address**: Source address of requests
+- **Timestamp**: Time of API calls
+- **User Agent**: Client/application information
+- **Endpoint/API Call**: Specific API endpoints accessed
+- **Parameters**: Request parameters
+- **Response Status Code**: HTTP status codes (200, 404, 500, etc.)
+- **Response Time**: API response duration
+
+### 2. Data Preprocessing
+Automatic feature extraction and data preparation:
+- **Timestamp Feature Extraction**: Hour, day, day-of-week from timestamps
+- **IP Address Analysis**: Extract octets and network information
+- **User Agent Parsing**: Browser, OS, and device detection
+- **Endpoint Encoding**: One-hot encoding for categorical endpoints
+- **Status Code Categorization**: Success, redirect, client error, server error
+- **Time-based Aggregation**: Request frequency per IP/time intervals
+- **Data Normalization**: StandardScaler for numerical features
+- **Missing Value Handling**: Fill with zeros for robust processing
+
+### 3. Graph Formation
+Transform API logs into graph structures for GNN analysis:
+- **Node Creation**: Each log entry becomes a node
+- **Edge Formation**: Connections based on IP addresses and endpoints
+- **Sequential Graphs**: Fallback to sequential connections when specific columns aren't found
+- **Feature Assignment**: Node features from preprocessed data
+
+### 4. Model Training
+Dual-model training approach:
+- **Autoencoder Training**: 
+  - Unsupervised learning on normal data
+  - Feature reconstruction for anomaly detection
+  - Configurable architecture (input_size, hidden_size, latent_size)
+  - Early stopping and validation monitoring
+- **GNN Training**:
+  - Graph-based learning for relationship patterns
+  - GCNConv layers for message passing
+  - Global mean pooling for graph-level representations
+  - Combined with autoencoder features for enhanced detection
+
+### 5. Anomaly Detection
+Real-time anomaly identification:
+- **Threshold Calculation**: Dynamic threshold based on reconstruction errors
+- **Multi-model Scoring**: Combined autoencoder and GNN predictions
+- **Anomaly Scoring**: Probability scores for each log entry
+- **False Positive Reduction**: Advanced filtering techniques
+
+### 6. Result Evaluation
+Comprehensive analysis and reporting:
+- **Visualization**: Interactive plots for anomalies and patterns
+- **Metrics**: Precision, recall, F1-score, ROC-AUC
+- **Export Options**: Downloadable anomaly reports
+- **Real-time Monitoring**: Continuous anomaly detection on new data
 
 ## Installation
 
 ### Prerequisites
-
 - Python 3.7+
-- pip (Python package manager)
+- pip package manager
 
 ### Setup
+```bash
+# Clone the repository
+git clone [repository-url]
+cd GNN
 
-1. Clone or download this repository to your local machine.
-2. Install the required dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-3. Launch the application:
-   ```
-   streamlit run app.py
-   ```
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+streamlit run app.py
+```
 
 ## Usage
 
-### Getting Started
+### 1. Start the Application
+```bash
+streamlit run app.py
+```
 
-1. After launching the application, you'll be presented with the home page showing two options:
-   - **Train New Model**: Upload data, perform exploratory data analysis (EDA), and train a new GNN model
-   - **Use Existing Model**: Upload data and use a pre-trained model to detect intrusions
+### 2. Navigate Through the Workflow
+- **Home Page**: Overview and navigation
+- **Data Collection**: Upload CSV files and map columns
+- **Preprocessing**: Automatic feature extraction
+- **Training**: Configure and train models
+- **Detection**: Run anomaly detection on new data
 
-### Training a New Model
+### 3. Input Data Format
+Your CSV should contain columns with these keywords (case-insensitive):
+- **IP**: 'ip', 'address', 'src', 'source'
+- **Timestamp**: 'time', 'date', 'timestamp'
+- **User Agent**: 'user', 'agent', 'browser', 'ua'
+- **Endpoint**: 'endpoint', 'api', 'url', 'path'
+- **Status**: 'status', 'code', 'response_code'
 
-1. Click on the **Train New Model** button on the home page.
-2. Upload your network traffic data in CSV format.
-3. The application will automatically preprocess your data and perform the following steps:
-   - Data cleaning (removing timestamp columns, handling IP addresses)
-   - Label encoding for classification
-   - Handling missing values and outliers
-   - Feature selection and normalization
+## Technical Architecture
 
-4. Explore your data through the comprehensive Exploratory Data Analysis (EDA) tools:
-   - **Data Overview**: View basic statistics, class distribution, and missing values analysis
-   - **Feature Analysis**: Examine feature distributions and outlier detection
-   - **Correlation Analysis**: Identify relationships between features using correlation matrices
-   - **Distribution Analysis**: Compare feature distributions across different classes
-   - **Dimensionality Reduction**: Visualize data using PCA or t-SNE
+### Models
+- **APILogAutoencoder**: Custom autoencoder for log data
+- **IDSGNNModel**: Graph neural network for API relationships
 
-5. Configure and train your GNN model:
-   - Set hyperparameters (learning rate, hidden layers, etc.)
-   - Choose training parameters (batch size, epochs)
-   - Monitor training progress with real-time metrics
+### Dependencies
+- **Streamlit**: Web interface
+- **PyTorch**: Deep learning framework
+- **PyTorch Geometric**: Graph neural networks
+- **Pandas**: Data manipulation
+- **Scikit-learn**: Machine learning utilities
+- **Plotly**: Interactive visualizations
 
-6. Evaluate model performance:
-   - View accuracy, precision, recall, and F1-score metrics
-   - Examine the confusion matrix
-   - Analyze feature importance
+### Model Storage
+- `models/autoencoder.pt`: Trained autoencoder weights
+- `models/gnn_model.pt`: Trained GNN weights
+- `models/anomaly_threshold.txt`: Detection threshold
+- `models/*.json`: Model parameters and configurations
 
-7. Save your trained model for future use.
+## Configuration
 
-### Using an Existing Model
+### Model Parameters
+- **Autoencoder**: Configurable hidden layers and latent space
+- **GNN**: Adjustable graph convolution layers
+- **Training**: Customizable epochs, learning rate, batch size
 
-1. Click on the **Use Existing Model** button on the home page.
-2. Upload your network traffic data for analysis.
-3. Select a previously trained model.
-4. The application will process your data and apply the selected model to detect intrusions.
-5. Explore the detection results:
-   - View predicted intrusion types
-   - Analyze detection confidence scores
-   - Visualize network traffic patterns with highlighted intrusions
-   - Examine detailed information about detected threats
+### Web Interface
+- Responsive design with custom CSS
+- Real-time progress tracking
+- Interactive visualizations
+- Export capabilities
 
-### Supported Attack Types
+## Troubleshooting
 
-The system can detect various types of network attacks, including:
-- DDoS/DoS attacks
-- Port scanning
-- Brute force attacks
-- Web attacks (SQL injection, XSS)
-- Botnet activities
-- And more...
+### Common Issues
+1. **Missing Dependencies**: Ensure all packages in requirements.txt are installed
+2. **Data Format**: Verify CSV format matches expected structure
+3. **Memory Issues**: Reduce batch size for large datasets
+4. **Training Time**: Adjust epochs based on dataset size
 
-### Data Requirements
+### Error Handling
+- Comprehensive error messages in the UI
+- Graceful fallback for missing columns
+- Automatic data validation and cleaning
 
-For optimal performance, your network traffic data should include:
-- Network connection information (source/destination IPs, ports)
-- Traffic statistics (packet sizes, counts, intervals)
-- Protocol information
-- Connection states
+## Contributing
 
-The application will automatically preprocess your data, but having clean, well-structured data will improve detection accuracy.
+### Development Setup
+```bash
+# Install development dependencies
+pip install -r requirements.txt
+
+# Run tests
+python -m pytest
+
+# Code formatting
+black .
+isort .
+```
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+For issues and questions:
+- Check the troubleshooting section
+- Review error messages in the application
+- Ensure data format compatibility
+- Verify all dependencies are properly installed
+
+## Performance Notes
+
+- **Scalability**: Handles datasets from thousands to millions of records
+- **Memory Usage**: Optimized for standard hardware configurations
+- **Training Time**: Varies based on dataset size and model complexity
+- **Real-time Processing**: Supports continuous monitoring scenarios
 
 
 
