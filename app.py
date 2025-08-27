@@ -648,70 +648,82 @@ def show_training_page():
     st.subheader("Pembagian Data")
     train_size = st.slider("Proporsi Data Training", 0.5, 0.9, 0.8, 0.05)
     
-    # Tombol untuk memulai pelatihan
-    if st.button("Mulai Pelatihan"):
-        with st.spinner("Melatih model... Ini mungkin memerlukan waktu beberapa menit."):
+    # State untuk tracking progress training
+    if 'training_step' not in st.session_state:
+        st.session_state['training_step'] = 'autoencoder'
+    
+    # Tombol untuk memulai pelatihan Autoencoder
+    st.subheader("🎯 Pelatihan Model")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### Autoencoder Training")
+        if st.button("Mulai Pelatihan Autoencoder", type="primary", key="train_ae"):
+            st.session_state['training_step'] = 'autoencoder'
+            st.session_state['start_autoencoder_training'] = True
+            st.rerun()
+    
+    with col2:
+        st.markdown("### GNN Training")
+        gnn_ready = st.session_state.get('autoencoder_trained', False)
+        if st.button("Mulai Pelatihan GNN", type="primary", key="train_gnn", disabled=not gnn_ready):
+            st.session_state['training_step'] = 'gnn'
+            st.session_state['start_gnn_training'] = True
+            st.rerun()
+    
+    # Pelatihan Autoencoder
+    if st.session_state.get('start_autoencoder_training', False):
+        with st.spinner("Melatih Autoencoder..."):
             try:
-                # Pembagian data
+                # Persiapan data
                 X = df_processed.values
                 X_train, X_test = train_test_split(X, train_size=train_size, random_state=42)
                 
-                # Pelatihan Autoencoder
-                st.markdown("#### Pelatihan Autoencoder")
-                progress_bar_ae = st.progress(0)
-                status_text_ae = st.empty()
-                
-                # Buat model Autoencoder
                 input_dim = X_train.shape[1]
                 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
                 
+                # Inisialisasi model
                 autoencoder = APILogAutoencoder(
                     input_dim=input_dim,
                     hidden_dims=hidden_dims,
                     dropout=dropout_ae
                 ).to(device)
                 
-                # Optimizer
                 optimizer_ae = torch.optim.Adam(autoencoder.parameters(), lr=learning_rate_ae)
                 
                 # Konversi data ke tensor
                 X_train_tensor = torch.tensor(X_train, dtype=torch.float).to(device)
                 X_test_tensor = torch.tensor(X_test, dtype=torch.float).to(device)
                 
-                # Training loop
+                # Training loop dengan visualisasi
                 train_losses_ae = []
                 test_losses_ae = []
                 
+                progress_bar_ae = st.progress(0)
+                status_text_ae = st.empty()
+                
                 for epoch in range(epochs_ae):
-                    # Train
                     autoencoder.train()
                     optimizer_ae.zero_grad()
                     
-                    # Forward pass
                     outputs = autoencoder(X_train_tensor)
-                    
-                    # Compute loss
                     loss = F.mse_loss(outputs, X_train_tensor)
-                    
-                    # Backward pass
                     loss.backward()
                     optimizer_ae.step()
                     
                     train_losses_ae.append(loss.item())
                     
-                    # Evaluate
                     autoencoder.eval()
                     with torch.no_grad():
                         test_outputs = autoencoder(X_test_tensor)
                         test_loss = F.mse_loss(test_outputs, X_test_tensor)
                         test_losses_ae.append(test_loss.item())
                     
-                    # Update progress
-                    progress = (epoch + 1) / epochs_ae
-                    progress_bar_ae.progress(progress)
-                    status_text_ae.text(f"Epoch {epoch+1}/{epochs_ae}, Train Loss: {loss.item():.6f}, Test Loss: {test_loss.item():.6f}")
+                    progress_bar_ae.progress((epoch + 1) / epochs_ae)
+                    status_text_ae.text(f"Autoencoder - Epoch {epoch+1}/{epochs_ae}, Loss: {loss.item():.6f}")
                 
-                # Hitung threshold untuk deteksi anomali
+                # Hitung threshold
                 autoencoder.eval()
                 with torch.no_grad():
                     test_outputs = autoencoder(X_test_tensor)
@@ -719,29 +731,75 @@ def show_training_page():
                 
                 threshold = calculate_anomaly_threshold(reconstruction_errors, method='std')
                 
-                st.success(f"Pelatihan Autoencoder selesai! Threshold anomali: {threshold:.6f}")
+                # Visualisasi hasil training
+                st.success(f"✅ Pelatihan Autoencoder selesai! Threshold: {threshold:.6f}")
                 
-                # Plot training curve
-                fig, ax = plt.subplots(figsize=(10, 6))
-                ax.plot(train_losses_ae, label='Train Loss')
-                ax.plot(test_losses_ae, label='Test Loss')
-                ax.set_xlabel('Epoch')
-                ax.set_ylabel('Loss')
-                ax.set_title('Autoencoder Training Curve')
-                ax.legend()
+                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+                
+                # Training curve
+                ax1.plot(train_losses_ae, label='Train Loss', color='blue')
+                ax1.plot(test_losses_ae, label='Test Loss', color='orange')
+                ax1.set_xlabel('Epoch')
+                ax1.set_ylabel('Loss')
+                ax1.set_title('Autoencoder Training Curve')
+                ax1.legend()
+                ax1.grid(True)
+                
+                # Distribution of reconstruction errors
+                ax2.hist(reconstruction_errors, bins=50, alpha=0.7, color='green', edgecolor='black')
+                ax2.axvline(x=threshold, color='red', linestyle='--', label=f'Threshold: {threshold:.4f}')
+                ax2.set_xlabel('Reconstruction Error')
+                ax2.set_ylabel('Frequency')
+                ax2.set_title('Distribution of Reconstruction Errors')
+                ax2.legend()
+                ax2.grid(True)
+                
+                plt.tight_layout()
                 st.pyplot(fig)
                 
-                # Pelatihan GNN
-                st.markdown("#### Pelatihan GNN")
-                progress_bar_gnn = st.progress(0)
-                status_text_gnn = st.empty()
+                # Simpan model dan parameter
+                os.makedirs("models", exist_ok=True)
+                torch.save(autoencoder.state_dict(), "models/autoencoder.pt")
+                with open("models/anomaly_threshold.txt", "w") as f:
+                    f.write(str(threshold))
+                
+                autoencoder_params = {
+                    "input_dim": input_dim,
+                    "hidden_dims": hidden_dims,
+                    "dropout": dropout_ae
+                }
+                with open("models/autoencoder_params.json", "w") as f:
+                    json.dump(autoencoder_params, f)
+                
+                # Update session state
+                st.session_state['autoencoder'] = autoencoder
+                st.session_state['anomaly_threshold'] = threshold
+                st.session_state['autoencoder_trained'] = True
+                st.session_state['start_autoencoder_training'] = False
+                
+                # Reset untuk GNN training
+                st.session_state['start_gnn_training'] = False
+                
+                st.info("🎯 Autoencoder siap! Sekarang Anda bisa melatih GNN.")
+                
+            except Exception as e:
+                st.error(f"Error saat pelatihan Autoencoder: {str(e)}")
+                st.session_state['start_autoencoder_training'] = False
+    
+    # Pelatihan GNN (setelah Autoencoder selesai)
+    if st.session_state.get('start_gnn_training', False) and st.session_state.get('autoencoder_trained', False):
+        with st.spinner("Melatih GNN..."):
+            try:
+                # Persiapan data untuk GNN
+                X = df_processed.values
+                device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
                 
                 # Buat graph data
                 graph_data = create_api_log_graph(pd.DataFrame(X))
                 
-                # Buat model GNN
+                # Inisialisasi model GNN
                 num_features = graph_data.x.shape[1]
-                num_classes = 2  # Normal vs Anomali
+                num_classes = 2
                 
                 gnn_model = IDSGNNModel(
                     num_features=num_features,
@@ -751,28 +809,67 @@ def show_training_page():
                     dropout=dropout_gnn
                 ).to(device)
                 
-                # Optimizer
-                optimizer_gnn = torch.optim.Adam(gnn_model.parameters(), lr=learning_rate_gnn)
+                # Include reconstruction head parameters in optimizer
+                gnn_params = list(gnn_model.parameters())
+                if hasattr(gnn_model, 'reconstruction_head'):
+                    gnn_params.extend(list(gnn_model.reconstruction_head.parameters()))
+                optimizer_gnn = torch.optim.Adam(gnn_params, lr=learning_rate_gnn)
                 
-                # Simpan model dan parameter
-                os.makedirs("models", exist_ok=True)
+                # Training loop dengan visualisasi
+                train_losses_gnn = []
                 
-                # Simpan Autoencoder
-                torch.save(autoencoder.state_dict(), "models/autoencoder.pt")
+                progress_bar_gnn = st.progress(0)
+                status_text_gnn = st.empty()
                 
-                # Simpan threshold
-                with open("models/anomaly_threshold.txt", "w") as f:
-                    f.write(str(threshold))
+                # Untuk GNN, kita gunakan data yang sama sebagai target (unsupervised)
+                # Dalam konteks deteksi anomali, kita latih untuk merekonstruksi fitur
+                for epoch in range(epochs_gnn):
+                    gnn_model.train()
+                    optimizer_gnn.zero_grad()
+                    
+                    # For GNN training - use the GNN model without global pooling
+                    # Create a dummy batch tensor for compatibility, but we'll use node-level outputs
+                    batch = torch.zeros(graph_data.x.size(0), dtype=torch.long).to(device)
+                    
+                    # Get node-level embeddings (before global pooling)
+                    x = graph_data.x.to(device)
+                    edge_index = graph_data.edge_index.to(device)
+                    
+                    # Process through GAT layers to get node embeddings
+                    for gat_layer in gnn_model.gat_layers:
+                        x = gat_layer(x, edge_index)
+                        x = F.elu(x)
+                        x = F.dropout(x, p=gnn_model.dropout, training=True)
+                    
+                    # Simple reconstruction from node embeddings
+                    if not hasattr(gnn_model, 'reconstruction_head'):
+                        gnn_model.reconstruction_head = torch.nn.Linear(x.size(-1), graph_data.x.size(1)).to(device)
+                        
+                    reconstructed = gnn_model.reconstruction_head(x)
+                    loss = F.mse_loss(reconstructed, graph_data.x.to(device))
+                    loss.backward()
+                    optimizer_gnn.step()
+                    
+                    train_losses_gnn.append(loss.item())
+                    
+                    progress_bar_gnn.progress((epoch + 1) / epochs_gnn)
+                    status_text_gnn.text(f"GNN - Epoch {epoch+1}/{epochs_gnn}, Loss: {loss.item():.6f}")
                 
-                # Simpan GNN
+                # Visualisasi hasil training
+                st.success("✅ Pelatihan GNN selesai!")
+                
+                fig, ax = plt.subplots(figsize=(10, 6))
+                ax.plot(train_losses_gnn, label='GNN Training Loss', color='purple')
+                ax.set_xlabel('Epoch')
+                ax.set_ylabel('Loss')
+                ax.set_title('GNN Training Curve')
+                ax.legend()
+                ax.grid(True)
+                
+                st.pyplot(fig)
+                
+                # Simpan model GNN
                 torch.save(gnn_model.state_dict(), "models/gnn_model.pt")
-                
-                # Simpan parameter model
-                autoencoder_params = {
-                    "input_dim": input_dim,
-                    "hidden_dims": hidden_dims,
-                    "dropout": dropout_ae
-                }
                 
                 gnn_params = {
                     "num_features": num_features,
@@ -781,28 +878,28 @@ def show_training_page():
                     "num_layers": num_layers,
                     "dropout": dropout_gnn
                 }
-                
-                with open("models/autoencoder_params.json", "w") as f:
-                    json.dump(autoencoder_params, f)
-                
                 with open("models/gnn_params.json", "w") as f:
                     json.dump(gnn_params, f)
                 
-                st.success("Model berhasil dilatih dan disimpan!")
-                
-                # Simpan model ke session state
-                st.session_state['autoencoder'] = autoencoder
+                # Update session state
                 st.session_state['gnn_model'] = gnn_model
-                st.session_state['anomaly_threshold'] = threshold
+                st.session_state['gnn_trained'] = True
+                st.session_state['start_gnn_training'] = False
                 
-                # Tambahkan tombol untuk lanjut ke deteksi anomali
-                if st.button("Lanjut ke Deteksi Anomali"):
-                    st.session_state['page'] = 'detect'
-                    st.rerun()
-            
+                # Tombol untuk lanjut ke deteksi
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("🎯 Lanjut ke Deteksi Anomali", type="primary"):
+                        st.session_state['page'] = 'detect'
+                        st.rerun()
+                with col2:
+                    if st.button("🏠 Kembali ke Beranda"):
+                        st.session_state['page'] = 'home'
+                        st.rerun()
+                
             except Exception as e:
-                st.error(f"Terjadi kesalahan saat melatih model: {str(e)}")
-                st.exception(e)
+                st.error(f"Error saat pelatihan GNN: {str(e)}")
+                st.session_state['start_gnn_training'] = False
 
 # Fungsi untuk menampilkan halaman deteksi anomali
 def show_detection_page():
