@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "Jika Anda menggunakan aplikasi ini dalam publikasi, harap sitasi repositori ini."
+authors:
+  - family-names: "Wijaya"
+    given-names: "Raden Aa Koesoema"
+    orcid: "https://orcid.org/0000-0002-1653-0802"
+title: "GRAPHNET"
+url: "https://github.com/RadenAaKoesoemaWijaya/GNN"
+repository-code: "https://github.com/RadenAaKoesoemaWijaya/GNN"
+doi: ""
+license: "MIT"
