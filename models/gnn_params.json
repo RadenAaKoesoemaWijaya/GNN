@@ -1,0 +1,1 @@
+{"num_features": 8, "num_classes": 2, "hidden_channels": 64, "num_layers": 2, "dropout": 0.2}
