@@ -780,7 +780,18 @@ def show_training_page():
                 # Reset untuk GNN training
                 st.session_state['start_gnn_training'] = False
                 
-                st.info("🎯 Autoencoder siap! Sekarang Anda bisa melatih GNN.")
+                st.success("🎯 Autoencoder siap! Sekarang Anda bisa melatih GNN.")
+                
+                # Tombol navigasi untuk melanjutkan ke GNN atau langsung ke deteksi
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("⚡ Lanjut ke Training GNN", type="primary", key="ae_to_gnn"):
+                        st.session_state['start_gnn_training'] = True
+                        st.rerun()
+                with col2:
+                    if st.button("🎯 Lanjut ke Deteksi Anomali", key="ae_to_detect"):
+                        st.session_state['page'] = 'detect'
+                        st.rerun()
                 
             except Exception as e:
                 st.error(f"Error saat pelatihan Autoencoder: {str(e)}")
@@ -932,15 +943,19 @@ def show_training_page():
                 st.session_state['gnn_model'] = gnn_model
                 st.session_state['gnn_trained'] = True
                 st.session_state['start_gnn_training'] = False
+                st.session_state['models_ready'] = True
                 
-                # Tombol untuk lanjut ke deteksi
+                # Notifikasi dan tombol navigasi
+                st.success("🎉 Model GNN berhasil dilatih dan disimpan!")
+                st.info("Klik tombol di bawah untuk langsung ke halaman deteksi anomali.")
+                
                 col1, col2 = st.columns(2)
                 with col1:
-                    if st.button("🎯 Lanjut ke Deteksi Anomali", type="primary"):
+                    if st.button("🎯 Lanjut ke Deteksi Anomali", type="primary", key="gnn_to_detect"):
                         st.session_state['page'] = 'detect'
                         st.rerun()
                 with col2:
-                    if st.button("🏠 Kembali ke Beranda"):
+                    if st.button("🏠 Kembali ke Beranda", key="gnn_to_home"):
                         st.session_state['page'] = 'home'
                         st.rerun()
                 
