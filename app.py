@@ -1056,6 +1056,16 @@ def show_detection_page():
                     df_processed = df_detect
                     df_original = df_detect
                 
+                # Ensure all data is numeric and handle any non-numeric values
+                df_numeric = df_processed.select_dtypes(include=[np.number])
+                if df_numeric.empty:
+                    st.error("Tidak ada kolom numerik yang ditemukan dalam data. Pastikan semua kolom telah dikonversi ke tipe numerik.")
+                    return
+                
+                # Handle any remaining NaN or infinite values
+                df_numeric = df_numeric.replace([np.inf, -np.inf], np.nan)
+                df_numeric = df_numeric.fillna(0)
+
                 # Load model jika belum ada di session state
                 if 'autoencoder' not in st.session_state:
                     # Load parameter model
@@ -1072,8 +1082,10 @@ def show_detection_page():
                     # Buat model
                     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
                     
+                    # Use actual data dimension instead of saved parameter
+                    actual_input_dim = df_numeric.shape[1]
                     autoencoder = APILogAutoencoder(
-                        input_dim=autoencoder_params["input_dim"],
+                        input_dim=actual_input_dim,
                         hidden_dims=autoencoder_params["hidden_dims"],
                         dropout=autoencoder_params["dropout"]
                     ).to(device)
@@ -1102,7 +1114,16 @@ def show_detection_page():
                 
                 # Deteksi anomali dengan Autoencoder
                 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-                X = torch.tensor(df_processed.values, dtype=torch.float).to(device)
+                
+                # Handle dimension mismatch - use only first 8 features to match saved model
+                if df_numeric.shape[1] > 8:
+                    st.warning(f"Data memiliki {df_numeric.shape[1]} fitur, tetapi model dilatih dengan 8 fitur. Menggunakan 8 fitur pertama.")
+                    X_subset = df_numeric.iloc[:, :8].values
+                else:
+                    st.warning(f"Data memiliki {df_numeric.shape[1]} fitur, kurang dari 8 fitur yang diharapkan. Menggunakan semua fitur yang tersedia.")
+                    X_subset = df_numeric.values
+                
+                X = torch.tensor(X_subset, dtype=torch.float32).to(device)
                 
                 autoencoder.eval()
                 with torch.no_grad():
