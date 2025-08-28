@@ -821,6 +821,53 @@ def show_training_page():
                 progress_bar_gnn = st.progress(0)
                 status_text_gnn = st.empty()
                 
+                # Visualisasi grafik hubungan antar node
+                st.subheader("Visualisasi Struktur Graf")
+                
+                # Buat visualisasi graf menggunakan networkx
+                G = nx.Graph()
+                
+                # Tambahkan nodes
+                num_nodes = graph_data.x.size(0)
+                G.add_nodes_from(range(num_nodes))
+                
+                # Tambahkan edges dari edge_index
+                edge_list = graph_data.edge_index.t().tolist()
+                G.add_edges_from(edge_list)
+                
+                # Buat figure untuk visualisasi
+                fig_graph, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+                
+                # Layout untuk visualisasi
+                pos = nx.spring_layout(G, k=1, iterations=50)
+                
+                # Plot 1: Struktur graf keseluruhan
+                nx.draw(G, pos, ax=ax1, node_size=20, node_color='lightblue', 
+                        edge_color='gray', alpha=0.7, with_labels=False)
+                ax1.set_title(f"Struktur Graf - {num_nodes} nodes, {len(edge_list)} edges")
+                
+                # Plot 2: Subgraf dengan node yang lebih terang (highlight)
+                # Pilih subset nodes untuk highlight
+                highlight_nodes = list(range(min(50, num_nodes)))
+                node_colors = ['red' if node in highlight_nodes else 'lightblue' 
+                               for node in G.nodes()]
+                node_sizes = [50 if node in highlight_nodes else 20 
+                              for node in G.nodes()]
+                
+                nx.draw(G, pos, ax=ax2, node_size=node_sizes, node_color=node_colors, 
+                        edge_color='gray', alpha=0.7, with_labels=False)
+                ax2.set_title("Subgraf dengan Node Highlight")
+                
+                plt.tight_layout()
+                st.pyplot(fig_graph)
+                
+                # Informasi grafik
+                st.info(f"📊 Informasi Graf: {num_nodes} nodes, {len(edge_list)} edges, Density: {nx.density(G):.4f}")
+                
+                # Simpan visualisasi graf untuk deteksi anomali
+                st.session_state['graph_structure'] = G
+                st.session_state['graph_pos'] = pos
+                
                 # Untuk GNN, kita gunakan data yang sama sebagai target (unsupervised)
                 # Dalam konteks deteksi anomali, kita latih untuk merekonstruksi fitur
                 for epoch in range(epochs_gnn):
