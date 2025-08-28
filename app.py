@@ -965,7 +965,7 @@ def show_training_page():
 
 # Fungsi untuk menampilkan halaman deteksi anomali
 def show_detection_page():
-    st.title("Langkah 4: Deteksi Anomali")
+    st.title("Deteksi Anomali")
     
     st.markdown("""
     ### Tujuan: Menggunakan model yang sudah dilatih untuk mendeteksi anomali pada data baru
@@ -1088,7 +1088,7 @@ def show_detection_page():
                     
                     # Load state dict
                     autoencoder.load_state_dict(torch.load("models/autoencoder.pt"))
-                    gnn_model.load_state_dict(torch.load("models/gnn_model.pt"))
+                    gnn_model.load_state_dict(torch.load("models/gnn_model.pt"), strict=False)
                     
                     # Simpan ke session state
                     st.session_state['autoencoder'] = autoencoder

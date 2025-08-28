@@ -9,7 +9,7 @@ import json
 fake = Faker()
 
 # Jumlah data yang akan dibuat
-num_records = 8000
+num_records = 800
 
 # Daftar endpoint API yang mungkin
 endpoints = [
